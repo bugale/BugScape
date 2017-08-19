@@ -1,19 +1,18 @@
-﻿using System.Security.Cryptography.X509Certificates;
-using System.Windows.Controls;
+﻿using System.Windows.Controls;
 
 namespace BugScapeClient {
-    public interface ISwitchable {
-        void SwitchTo();
+    public interface ISwitchable<in T> {
+        void SwitchTo(T state);
         void SwitchFrom();
     }
 
     public static class MainWindowPager {
         public static MainWindow Window { get; set; }
 
-        public static void SwitchPage(Page page) {
-            (Window.Content as ISwitchable)?.SwitchFrom();
+        public static void SwitchPage<T>(Page page, T state) {
+            (Window.Content as ISwitchable<T>)?.SwitchFrom();
             Window.Content = page;
-            (Window.Content as ISwitchable)?.SwitchTo();
+            (Window.Content as ISwitchable<T>)?.SwitchTo(state);
         }
     }
 
@@ -21,7 +20,7 @@ namespace BugScapeClient {
         public MainWindow() {
             this.InitializeComponent();
             MainWindowPager.Window = this;
-            MainWindowPager.SwitchPage(new GamePage());
+            MainWindowPager.SwitchPage<object>(new LoginPage(), null);
         }
     }
 }

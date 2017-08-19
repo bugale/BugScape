@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Net.Http;
-using System.Runtime.Serialization.Formatters;
-using System.Text;
 using System.Threading.Tasks;
 using System.Timers;
 using System.Windows;
@@ -11,17 +8,11 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using BugScapeCommon;
-using Newtonsoft.Json;
 
 namespace BugScapeClient {
-    public partial class GamePage : ISwitchable {
-        private static readonly HttpClient Client = new HttpClient();
+    public partial class GamePage : ISwitchable<int> {
         private readonly Timer _refreshTimer = new Timer(50);
-
-        private static readonly JsonSerializerSettings JsonSettings = new JsonSerializerSettings {
-            TypeNameHandling = TypeNameHandling.All,
-            TypeNameAssemblyFormat = FormatterAssemblyStyle.Full
-        };
+        private int _characterID;
 
         private static readonly Dictionary<Key, EDirection> KeyDictionary = new Dictionary<Key, EDirection> {
             {Key.Left, EDirection.Left},
@@ -35,32 +26,25 @@ namespace BugScapeClient {
             this._refreshTimer.Start();
         }
 
-        public void SwitchTo() {
-            MainWindowPager.Window.KeyDown += OnKeyDown;
+        public void SwitchTo(int characterID) {
+            this._characterID = characterID;
+            MainWindowPager.Window.KeyDown += this.OnKeyDown;
             this._refreshTimer.Elapsed += this.OnRefreshElapsed;
         }
 
         public void SwitchFrom() {
-            MainWindowPager.Window.KeyDown -= OnKeyDown;
+            MainWindowPager.Window.KeyDown -= this.OnKeyDown;
             this._refreshTimer.Elapsed -= this.OnRefreshElapsed;
         }
 
-        private static async Task<BugScapeResponse> SendBugScapeRequestAsync(BugScapeRequest request) {
-            var post =
-            new StringContent(await JsonConvert.SerializeObjectAsync(request, Formatting.Indented, JsonSettings),
-                              Encoding.UTF8, "application/json");
-            var responseHttp = await Client.PostAsync(ServerSettings.ServerAddress, post);
-            var responseJson = await responseHttp.Content.ReadAsStringAsync();
-            return await JsonConvert.DeserializeObjectAsync<BugScapeResponse>(responseJson, JsonSettings);
-        }
-
-        private static async void OnKeyDown(object sender, KeyEventArgs args) {
+        private async void OnKeyDown(object sender, KeyEventArgs args) {
             if (!KeyDictionary.ContainsKey(args.Key)) {
                 /* Do nothing */
                 return;
             }
 
-            var response = await SendBugScapeRequestAsync(new BugScapeMoveRequest(2, KeyDictionary[args.Key]));
+            var response =
+            await BugScapeCommunicate.SendBugScapeRequestAsync(new BugScapeMoveRequest(this._characterID, KeyDictionary[args.Key]));
             if (response.Result != EBugScapeResult.Success) {
                 Debug.WriteLine("Failed moving");
             }
@@ -76,7 +60,9 @@ namespace BugScapeClient {
 
         private async Task<EBugScapeResult> RefreshGameAsync() {
             try {
-                var response = (await SendBugScapeRequestAsync(new BugScapeGetMapStateRequest(2))) as BugScapeMapResponse;
+                var response =
+                (await BugScapeCommunicate.SendBugScapeRequestAsync(new BugScapeGetMapStateRequest(this._characterID)))
+                as BugScapeMapResponse;
 
                 if (response == null) {
                     Debug.WriteLine("Invalid response");
