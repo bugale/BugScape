@@ -1,6 +1,8 @@
 ﻿using System;
 using System.IO;
 using System.Net;
+using System.Runtime.Serialization;
+using System.Runtime.Serialization.Formatters;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,15 +10,17 @@ using BugScapeCommon;
 using Newtonsoft.Json;
 
 namespace BugScape {
-
     public class BugScapeServer {
         private readonly CancellationToken _cancel = new CancellationToken();
 
+        private static readonly JsonSerializerSettings JsonSettings = new JsonSerializerSettings {
+            TypeNameHandling = TypeNameHandling.All,
+            Binder = new EntityFrameworkSerializationBinder()
+        };
+
         public async Task Run() {
             var listener = new HttpListener();
-
             listener.Prefixes.Add(ServerSettings.ServerAddress);
-
             listener.Start();
             
             while (!this._cancel.IsCancellationRequested) {
@@ -27,21 +31,20 @@ namespace BugScape {
         private static async Task HandleRequestAsync(object state) {
             var dbContext = new BugScapeDbContext();
             var context = (HttpListenerContext)state;
-            var streamReader = new StreamReader(context.Request.InputStream, context.Request.ContentEncoding);
-            dynamic reqJson = await JsonConvert.DeserializeObjectAsync(await streamReader.ReadToEndAsync());
-            BugScapeResponse response;
 
-            switch ((EBugScapeOperation)reqJson.Operation) {
+            var streamReader = new StreamReader(context.Request.InputStream, context.Request.ContentEncoding);
+            var request = await JsonConvert.DeserializeObjectAsync<BugScapeRequest>(await streamReader.ReadToEndAsync(), JsonSettings);
+
+            BugScapeResponse response;
+            switch (request.Operation) {
             case EBugScapeOperation.GetMapState:
-                Console.WriteLine("Getting map state");
-                response = await HandleMapStateRequestAsync(reqJson, dbContext);
+                response = await HandleMapStateRequestAsync(request, dbContext);
                 break;
             case EBugScapeOperation.Move:
-                Console.WriteLine("Moving character");
-                response = await HandleMoveRequestAsync(reqJson, dbContext);
+                response = await HandleMoveRequestAsync(request as BugScapeMoveRequest, dbContext);
                 break;
             default:
-                Console.WriteLine("Invalid operation {0}", (EBugScapeOperation)reqJson.Operatrion);
+                Console.WriteLine("Invalid operation {0}", request.Operation);
                 return;
             }
 
@@ -49,28 +52,27 @@ namespace BugScape {
                 response = new BugScapeResponse(EBugScapeResult.Error);
             }
 
-            context.Response.ContentEncoding = Encoding.UTF8;
+            var saveTask = dbContext.SaveChangesAsync();
+
+            context.Response.ContentEncoding = context.Request.ContentEncoding;
             var resStream = new StreamWriter(context.Response.OutputStream, context.Response.ContentEncoding);
-            await resStream.WriteAsync(await JsonConvert.SerializeObjectAsync(response));
+            await resStream.WriteAsync(await JsonConvert.SerializeObjectAsync(response, Formatting.Indented, JsonSettings));
             await resStream.FlushAsync();
             context.Response.Close();
-            await dbContext.SaveChangesAsync();
-        }
-        private static async Task<BugScapeResponse> HandleMapStateRequestAsync(dynamic request, BugScapeDbContext dbContext) {
-            var character = await dbContext.Characters.FindAsync((int)request.CharacterID);
-            if (character != null) return new BugScapeMapResponse(character.Map);
 
-            Console.WriteLine("No characeter found");
-            return null;
+            await saveTask;
         }
-        private static async Task<BugScapeResponse> HandleMoveRequestAsync(dynamic request, BugScapeDbContext dbContext) {
-            var character = await dbContext.Characters.FindAsync((int)request.CharacterID);
-            if (character == null) {
-                Console.WriteLine("No characeter found");
-                return null;
-            }
 
-            character.Move((EDirection)request.Direction);
+        private static async Task<BugScapeMapResponse> HandleMapStateRequestAsync(BugScapeRequest request, BugScapeDbContext dbContext) {
+            if (request == null) return null;
+            var character = await dbContext.Characters.FindAsync(request.CharacterID);
+            return new BugScapeMapResponse(character?.Map);
+        }
+
+        private static async Task<BugScapeResponse> HandleMoveRequestAsync(BugScapeMoveRequest request, BugScapeDbContext dbContext) {
+            if (request == null) return null;
+            var character = await dbContext.Characters.FindAsync(request.CharacterID);
+            character?.Move(request.Direction);
             return new BugScapeResponse(EBugScapeResult.Success);
         }
     }
