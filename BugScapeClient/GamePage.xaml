@@ -1,0 +1,26 @@
+﻿<Page x:Class="BugScapeClient.GamePage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:bugScapeCommon="clr-namespace:BugScapeCommon;assembly=BugScapeCommon"
+      mc:Ignorable="d" 
+      Title="GamePage">
+    <Canvas x:Name="MainCanvas" Width="0" Height="0">
+        <Canvas.Background>
+            <DrawingBrush TileMode="Tile" Viewport="{x:Static bugScapeCommon:ClientSettings.GuiTileRect}" 
+                                     ViewportUnits="Absolute">
+                <DrawingBrush.Drawing>
+                    <GeometryDrawing>
+                        <GeometryDrawing.Geometry>
+                            <RectangleGeometry Rect="{x:Static bugScapeCommon:ClientSettings.GuiTileRect}"/>
+                        </GeometryDrawing.Geometry>
+                        <GeometryDrawing.Pen>
+                            <Pen Brush="Gray" Thickness="1"/>
+                        </GeometryDrawing.Pen>
+                    </GeometryDrawing>
+                </DrawingBrush.Drawing>
+            </DrawingBrush>
+        </Canvas.Background>
+    </Canvas>
+</Page>
