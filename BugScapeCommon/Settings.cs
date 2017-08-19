@@ -14,5 +14,8 @@ namespace BugScapeCommon {
 
     public static class ServerSettings {
         public static string ServerAddress = "http://127.0.0.1:8081/";
+        public static int PasswordHashSaltLength = 128;
+        public static int PasswordHashLength = 128;
+        public static int PasswordHashIterations = 1024;
     }
 }

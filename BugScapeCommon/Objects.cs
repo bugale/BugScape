@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Newtonsoft.Json;
 
@@ -45,6 +46,9 @@ namespace BugScapeCommon {
         [JsonIgnore]
         public virtual Map Map { get; set; }
 
+        [JsonIgnore]
+        public virtual User User { get; set; }
+
         public void Move(EDirection direction) {
             var destination = new Point2D(this.Location);
             switch (direction) {
@@ -72,4 +76,20 @@ namespace BugScapeCommon {
         }
     }
 
+    public class User {
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int UserID { get; set; }
+
+        [Index(IsUnique = true)]
+        [MaxLength(256)]
+        public string Username { get; set; }
+
+        [JsonIgnore]
+        public byte[] PasswordHash { get; set; }
+
+        [JsonIgnore]
+        public byte[] PasswordSalt { get; set; }
+
+        public virtual ICollection<Character> Characters { get; set; }
+    }
 }

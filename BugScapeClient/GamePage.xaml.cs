@@ -10,9 +10,9 @@ using System.Windows.Media;
 using BugScapeCommon;
 
 namespace BugScapeClient {
-    public partial class GamePage : ISwitchable<int> {
+    public partial class GamePage : ISwitchable {
         private readonly Timer _refreshTimer = new Timer(50);
-        private int _characterID;
+        private readonly Character _character;
 
         private static readonly Dictionary<Key, EDirection> KeyDictionary = new Dictionary<Key, EDirection> {
             {Key.Left, EDirection.Left},
@@ -21,17 +21,16 @@ namespace BugScapeClient {
             {Key.Down, EDirection.Down}
         };
 
-        public GamePage() {
+        public GamePage(Character character) {
             this.InitializeComponent();
+            this._character = character;
             this._refreshTimer.Start();
         }
 
-        public void SwitchTo(int characterID) {
-            this._characterID = characterID;
+        public void SwitchTo() {
             MainWindowPager.Window.KeyDown += this.OnKeyDown;
             this._refreshTimer.Elapsed += this.OnRefreshElapsed;
         }
-
         public void SwitchFrom() {
             MainWindowPager.Window.KeyDown -= this.OnKeyDown;
             this._refreshTimer.Elapsed -= this.OnRefreshElapsed;
@@ -44,7 +43,7 @@ namespace BugScapeClient {
             }
 
             var response =
-            await BugScapeCommunicate.SendBugScapeRequestAsync(new BugScapeMoveRequest(this._characterID, KeyDictionary[args.Key]));
+            await BugScapeCommunicate.SendBugScapeRequestAsync(new BugScapeRequestMove(this._character.CharacterID, KeyDictionary[args.Key]));
             if (response.Result != EBugScapeResult.Success) {
                 Debug.WriteLine("Failed moving");
             }
@@ -61,8 +60,8 @@ namespace BugScapeClient {
         private async Task<EBugScapeResult> RefreshGameAsync() {
             try {
                 var response =
-                (await BugScapeCommunicate.SendBugScapeRequestAsync(new BugScapeGetMapStateRequest(this._characterID)))
-                as BugScapeMapResponse;
+                (await BugScapeCommunicate.SendBugScapeRequestAsync(new BugScapeRequestMapState(this._character.CharacterID)))
+                as BugScapeResponseMapState;
 
                 if (response == null) {
                     Debug.WriteLine("Invalid response");

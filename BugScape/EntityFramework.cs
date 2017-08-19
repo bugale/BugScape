@@ -16,5 +16,6 @@ namespace BugScape {
 
         public DbSet<Map> Maps { get; set; }
         public DbSet<Character> Characters { get; set; }
+        public DbSet<User> Users { get; set; }
     }
 }

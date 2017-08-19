@@ -1,41 +1,63 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace BugScapeCommon {
+    public class BugScapeRequest { }
 
-namespace BugScapeCommon {
-    public class BugScapeRequest {
-        public EBugScapeOperation Operation;
-        public int CharacterID;
+    public class BugScapeRequestRegister : BugScapeRequest {
+        public string Username { get; set; }
+        public string Password { get; set; }
+
+        public BugScapeRequestRegister(string username, string password) {
+            this.Username = username;
+            this.Password = password;
+        }
     }
 
-    public class BugScapeGetMapStateRequest : BugScapeRequest {
-        public BugScapeGetMapStateRequest(int characterID) {
-            this.Operation = EBugScapeOperation.GetMapState;
+    public class BugScapeRequestLogin : BugScapeRequest {
+        public string Username { get; set; }
+        public string Password { get; set; }
+
+        public BugScapeRequestLogin(string username, string password) {
+            this.Username = username;
+            this.Password = password;
+        }
+    }
+
+    public class BugScapeRequestGame : BugScapeRequest {
+        public int CharacterID { get; set; }
+    }
+
+    public class BugScapeRequestMapState : BugScapeRequestGame {
+        public BugScapeRequestMapState(int characterID) {
             this.CharacterID = characterID;
         }
     }
 
-    public class BugScapeMoveRequest : BugScapeRequest {
-        public EDirection Direction;
+    public class BugScapeRequestMove : BugScapeRequestGame {
+        public EDirection Direction { get; }
 
-        public BugScapeMoveRequest(int characterID, EDirection direction) {
-            this.Operation = EBugScapeOperation.Move;
+        public BugScapeRequestMove(int characterID, EDirection direction) {
             this.CharacterID = characterID;
             this.Direction = direction;
         }
     }
 
+
     public class BugScapeResponse {
-        public EBugScapeResult Result;
+        public EBugScapeResult Result { get; set; }
+
+        public string ResultExplain { get; set; }
 
         public BugScapeResponse(EBugScapeResult result) { this.Result = result; }
     }
 
-    public class BugScapeMapResponse : BugScapeResponse {
-        public Map Map;
+    public class BugScapeResponseMapState : BugScapeResponse {
+        public Map Map { get; set; }
 
-        public BugScapeMapResponse(Map map) : base(EBugScapeResult.Success) { this.Map = map; }
+        public BugScapeResponseMapState(Map map) : base(EBugScapeResult.Success) { this.Map = map; }
+    }
+
+    public class BugScapeResponseUser : BugScapeResponse {
+        public User User { get; set; }
+
+        public BugScapeResponseUser(User user) : base(EBugScapeResult.Success) { this.User = user; }
     }
 }
