@@ -11,7 +11,7 @@ using BugScapeCommon;
 
 namespace BugScapeClient {
     public partial class GamePage : ISwitchable {
-        private readonly Timer _refreshTimer = new Timer(50);
+        private readonly Timer _refreshTimer = new Timer(200);
         private readonly Character _character;
 
         private static readonly Dictionary<Key, EDirection> KeyDictionary = new Dictionary<Key, EDirection> {

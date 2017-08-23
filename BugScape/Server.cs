@@ -32,7 +32,7 @@ namespace BugScape {
 
         public async Task Run() {
             using (var listener = new HttpListener()) {
-                listener.Prefixes.Add(ServerSettings.ServerAddress);
+                listener.Prefixes.Add(ServerSettings.ListenAddress);
                 listener.Start();
 
                 while (!this._cancel.IsCancellationRequested) {
