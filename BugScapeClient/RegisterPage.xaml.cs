@@ -13,14 +13,14 @@ namespace BugScapeClient {
         public void SwitchTo(string state) { if (state != null) this.UsernameTextBox.Text = state; }
         public void SwitchFrom() { }
 
-        private async void RegisterButton_Click(object sender, RoutedEventArgs e) {
+        private void RegisterButton_Click(object sender, RoutedEventArgs e) {
             if (this.PasswordRetypeTextBox.Password != this.PasswordTextBox.Password) {
                 MessageBox.Show("Passwords do not match!");
                 return;
             }
 
             var request = new BugScapeRequestRegister(this.UsernameTextBox.Text, this.PasswordTextBox.Password);
-            var response = await BugScapeCommunicate.SendBugScapeRequestAsync(request);
+            var response = BugScapeCommunicate.SendBugScapeRequest(request);
 
             switch (response.Result) {
             case EBugScapeResult.ErrorUserAlreadyExists:

@@ -12,7 +12,7 @@ namespace BugScapeClient {
 
         private async void LoginButton_Click(object sender, RoutedEventArgs e) {
             var request = new BugScapeRequestLogin(this.UsernameTextBox.Text, this.PasswordTextBox.Password);
-            var response = await BugScapeCommunicate.SendBugScapeRequestAsync(request);
+            var response = BugScapeCommunicate.SendBugScapeRequest(request);
 
             switch (response.Result) {
             case EBugScapeResult.ErrorInvalidCredentials:
