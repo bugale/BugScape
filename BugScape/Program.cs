@@ -10,9 +10,8 @@ namespace BugScape {
     internal class Program {
         private static void Main(string[] args) {
             Console.WriteLine("Hello BugScape!");
-
-            var server = new BugScapeServer();
-            server.Run().Wait();
+            
+            BugScapeServer.Run().Wait();
         }
     }
 }

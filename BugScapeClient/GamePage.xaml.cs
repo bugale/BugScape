@@ -11,7 +11,7 @@ using BugScapeCommon;
 
 namespace BugScapeClient {
     public partial class GamePage : ISwitchable {
-        private readonly Timer _refreshTimer = new Timer(5000);
+        private Map _map;
         private readonly Character _character;
 
         private static readonly Dictionary<Key, EDirection> KeyDictionary = new Dictionary<Key, EDirection> {
@@ -20,72 +20,47 @@ namespace BugScapeClient {
             {Key.Up, EDirection.Up},
             {Key.Down, EDirection.Down}
         };
-    /* TODO: Try with Release */
 
-        public GamePage(Character character) {
+        public GamePage(Map map, Character character) {
             this.InitializeComponent();
+            this._map = map;
             this._character = character;
         }
 
         public void SwitchTo() {
-            MainWindowPager.Window.KeyDown += this.OnKeyDown;
-            this._refreshTimer.Elapsed += this.OnRefreshElapsed;
-            this._refreshTimer.Start();
+            ClientConnection.MessageReceivedEvent += this.HandleServerData;
+            MainWindowPager.Window.KeyDown += OnKeyDown;
+            this.DrawMap();
         }
         public void SwitchFrom() {
-            MainWindowPager.Window.KeyDown -= this.OnKeyDown;
-            this._refreshTimer.Elapsed -= this.OnRefreshElapsed;
-            this._refreshTimer.Stop();
+            ClientConnection.MessageReceivedEvent -= this.HandleServerData;
+            MainWindowPager.Window.KeyDown -= OnKeyDown;
         }
 
-        private void OnKeyDown(object sender, KeyEventArgs args) {
+        private async Task HandleServerData(BugScapeMessage message) {
+            if ((message as BugScapeUpdateMapChanged)?.Map.MapID == this._map.MapID) {
+                this._map = ((BugScapeUpdateMapChanged)message).Map;
+                this.DrawMap();
+            }
+
+            // To avoid warning
+            await Task.Delay(0);
+        }
+
+        private static async void OnKeyDown(object sender, KeyEventArgs args) {
             if (!KeyDictionary.ContainsKey(args.Key)) {
                 /* Do nothing */
                 return;
             }
-
-            var response =
-            BugScapeCommunicate.SendBugScapeRequest(new BugScapeRequestMove(this._character.CharacterID,
-                                                                            KeyDictionary[args.Key]));
-            if (response.Result != EBugScapeResult.Success) {
-                Debug.WriteLine("Failed moving");
-            }
+            await ClientConnection.Client.SendObjectAsync(new BugScapeRequestMove(KeyDictionary[args.Key]));
         }
-
-        private void OnRefreshElapsed(object sender, EventArgs e) {
-            try {
-                this.RefreshGameAsync().Wait();
-            } catch (Exception ex) {
-                Debug.WriteLine("Exception in OnRefreshElapsed: {0}", new object[] {ex.ToString()});
-            }
-        }
-
-        private async Task<EBugScapeResult> RefreshGameAsync() {
-            try {
-                var response =
-                (BugScapeCommunicate.SendBugScapeRequest(new BugScapeRequestMapState(this._character.CharacterID))) as
-                BugScapeResponseMapState;
-
-                if (response == null) {
-                    Debug.WriteLine("Invalid response");
-                    return EBugScapeResult.Error;
-                }
-
-                await this.Dispatcher.InvokeAsync(() => this.DrawMap(response.Map));
-
-                return response.Result;
-            } catch (Exception ex) {
-                Debug.WriteLine("Exception in RefreshGameAsync: {0}", new object[] { ex.ToString() });
-                return EBugScapeResult.Error;
-            }
-        }
-
-        private void DrawMap(Map m) {
+        
+        private void DrawMap() {
             this.MainCanvas.Children.Clear();
 
-            this.MainCanvas.Width = 50 * m.Width;
-            this.MainCanvas.Height = 50 * m.Height;
-            foreach (var mapCharacter in m.Characters) {
+            this.MainCanvas.Width = 50 * this._map.Width;
+            this.MainCanvas.Height = 50 * this._map.Height;
+            foreach (var mapCharacter in this._map.Characters) {
                 var border = new Border {BorderBrush = Brushes.Transparent, Height = 50, Width = 50};
                 var textBlock = new TextBlock {
                     Text = mapCharacter.CharacterID.ToString(),

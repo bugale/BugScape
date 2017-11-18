@@ -82,7 +82,6 @@
     </Page>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BugScapeCommunicate.cs" />
     <Compile Include="GamePage.xaml.cs">
       <DependentUpon>GamePage.xaml</DependentUpon>
     </Compile>

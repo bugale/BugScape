@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Net.Sockets;
 using Newtonsoft.Json;
 
 namespace BugScapeCommon {
@@ -25,6 +26,10 @@ namespace BugScapeCommon {
         }
 
         public bool IsInsideRectangle(Point2D point2) { return this.IsInsideRectangle(new Point2D(0, 0), point2); }
+
+        public Point2D CloneToServer() {
+            return new Point2D(this);
+        }
     }
 
     public class Map {
@@ -35,6 +40,10 @@ namespace BugScapeCommon {
         public int Height { get; set; }
 
         public virtual ICollection<Character> Characters { get; set; }
+        
+        public Map CloneToServer() {
+            return new Map { MapID = this.MapID, Width = this.Width, Height = this.Height };
+        }
     }
 
     public class Character {
@@ -48,6 +57,14 @@ namespace BugScapeCommon {
 
         [JsonIgnore]
         public virtual User User { get; set; }
+
+        [JsonIgnore]
+        [NotMapped]
+        public JsonClient Client { get; set; }
+
+        public Character CloneToServer() {
+            return new Character {CharacterID = this.CharacterID, User = this.User.CloneToServer(), Location = this.Location.CloneToServer()};
+        }
 
         public void Move(EDirection direction) {
             var destination = new Point2D(this.Location);
@@ -89,6 +106,10 @@ namespace BugScapeCommon {
 
         [JsonIgnore]
         public byte[] PasswordSalt { get; set; }
+
+        public User CloneToServer() {
+            return new User { UserID = this.UserID, Username = this.Username };
+        }
 
         public virtual ICollection<Character> Characters { get; set; }
     }

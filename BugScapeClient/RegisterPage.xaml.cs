@@ -1,43 +1,39 @@
-﻿using System.Windows;
+﻿using System.Threading.Tasks;
+using System.Windows;
 using BugScapeCommon;
 
 namespace BugScapeClient {
-    public partial class RegisterPage {
+    public partial class RegisterPage : ISwitchable {
         public RegisterPage() {
             this.InitializeComponent();
         }
 
         public RegisterPage(string username) : this() { this.UsernameTextBox.Text = username; }
 
+        public void SwitchTo() { ClientConnection.MessageReceivedEvent += this.HandleServerResponse; }
+        public void SwitchFrom() { ClientConnection.MessageReceivedEvent -= this.HandleServerResponse; }
 
-        public void SwitchTo(string state) { if (state != null) this.UsernameTextBox.Text = state; }
-        public void SwitchFrom() { }
-
-        private void RegisterButton_Click(object sender, RoutedEventArgs e) {
+        private async void RegisterButton_Click(object sender, RoutedEventArgs e) {
+            this.IsEnabled = false;
             if (this.PasswordRetypeTextBox.Password != this.PasswordTextBox.Password) {
                 MessageBox.Show("Passwords do not match!");
+                this.IsEnabled = true;
                 return;
             }
 
-            var request = new BugScapeRequestRegister(this.UsernameTextBox.Text, this.PasswordTextBox.Password);
-            var response = BugScapeCommunicate.SendBugScapeRequest(request);
-
-            switch (response.Result) {
-            case EBugScapeResult.ErrorUserAlreadyExists:
-                MessageBox.Show("Username already exists!");
-                break;
-            case EBugScapeResult.Success:
-                MessageBox.Show("Registered successfully. Please login now.");
-                MainWindowPager.SwitchPage(new LoginPage(this.UsernameTextBox.Text));
-                break;
-            default:
-                MessageBox.Show("Error during registration: " + response.ResultExplain);
-                break;
-            }
+            await ClientConnection.Client.SendObjectAsync(new BugScapeRequestRegister(this.UsernameTextBox.Text, this.PasswordTextBox.Password));
         }
 
-        private void LoginButton_Click(object sender, RoutedEventArgs e) {
-            MainWindowPager.SwitchPage(new LoginPage(this.UsernameTextBox.Text));
+        private async Task HandleServerResponse(BugScapeMessage message) {
+            if (message is BugScapeResponseRegisterSuccessful) {
+                MainWindowPager.SwitchPage(new LoginPage(this.UsernameTextBox.Text));
+            } else if (message is BugScapeResponseRegisterAlreadyExist) {
+                MessageBox.Show("This user already exists");
+                this.IsEnabled = true;
+            }
+
+            // To avoid warning
+            await Task.Delay(0);
         }
     }
 }

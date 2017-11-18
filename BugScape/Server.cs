@@ -1,80 +1,93 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Data.Entity;
-using System.IO;
 using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using BugScapeCommon;
-using Newtonsoft.Json;
 
 namespace BugScape {
     public class BugScapeServer {
-        private readonly CancellationToken _cancel = new CancellationToken();
         private static readonly SemaphoreSlim RegistrationLock = new SemaphoreSlim(1);
-        
-        private static readonly Dictionary<Type, AsyncJsonTcpReactor<BugScapeRequest, BugScapeResponse>.RequestHandler> HandlerDictionary = new Dictionary<Type, AsyncJsonTcpReactor<BugScapeRequest, BugScapeResponse>.RequestHandler>
-        {
-            {typeof(BugScapeRequestMapState), HandleRequestMapStateAsync},
-            {typeof(BugScapeRequestMove), HandleRequestMoveAsync},
-            {typeof(BugScapeRequestRegister), HandleRequestRegisterAsync},
-            {typeof(BugScapeRequestLogin), HandleRequestLoginAsync},
-        };
+        private static readonly SemaphoreSlim LoginLock = new SemaphoreSlim(1);
+        private static readonly AsyncJsonTcpReactor<BugScapeMessage> Reactor = new AsyncJsonTcpReactor<BugScapeMessage>();
 
-        public async Task Run() {
-            var reactor = new AsyncJsonTcpReactor<BugScapeRequest, BugScapeResponse>(IPAddress.Any, ServerSettings.ServerPort);
-            foreach (var entry in HandlerDictionary) {
-                reactor.SetHandler(entry.Key, entry.Value);
+        private static readonly Dictionary<int, Map> OnlineMaps = new Dictionary<int, Map>();
+        private static readonly Dictionary<JsonClient, Character> OnlineCharacters = new Dictionary<JsonClient, Character>();
+        private static readonly HashSet<int> LoggedInUserIDs = new HashSet<int>();
+
+        public static async Task Run() {
+            Reactor.SetHandler(AsyncJsonTcpReactor<BugScapeMessage>.ReactorAction.Disconnected, HandleUserDisconnectionAsync);
+            Reactor.SetHandler(AsyncJsonTcpReactor<BugScapeMessage>.ReactorAction.ReceivedData, HandleUserMessageAsync);
+
+            /* Load all maps */
+            using (var dbContext = new BugScapeDbContext()) {
+                foreach (var map in dbContext.Maps) {
+                    OnlineMaps[map.MapID] = map.CloneToServer();
+                    OnlineMaps[map.MapID].Characters = new List<Character>();
+                }
             }
-            await reactor.Run();
+
+            /* Run reactor */
+            await Reactor.RunServerAsync(IPAddress.Any, ServerSettings.ServerPort);
         }
         
-        private static async Task<BugScapeResponse> HandleRequestMapStateAsync(BugScapeRequest request) {
-            using (var dbContext = new BugScapeDbContext()) {
-                var specRequest = request as BugScapeRequestMapState;
-                if (specRequest == null) return new BugScapeResponse(EBugScapeResult.Error);
-                var character = await dbContext.Characters.FindAsync(specRequest.CharacterID);
-                if (character == null) return new BugScapeResponseMapState(null);
-                await dbContext.Entry(character).Reference(c => c.Map).LoadAsync();
-                await dbContext.Entry(character.Map).Collection(c => c.Characters).LoadAsync();
-                return new BugScapeResponseMapState(character.Map);
+        private static async Task HandleUserDisconnectionAsync(JsonClient client,
+                                                       AsyncJsonTcpReactor<BugScapeMessage>.ReactorAction action,
+                                                       BugScapeMessage data) {
+            if (OnlineCharacters.ContainsKey(client)) {
+                await RemoveCharacterFromMap(OnlineCharacters[client]);
+                LoggedInUserIDs.Remove(OnlineCharacters[client].User.UserID);
+                OnlineCharacters.Remove(client);
             }
         }
-        private static async Task<BugScapeResponse> HandleRequestMoveAsync(BugScapeRequest request) {
-            using (var dbContext = new BugScapeDbContext()) {
-                var specRequest = request as BugScapeRequestMove;
-                if (specRequest == null) return new BugScapeResponse(EBugScapeResult.Error);
-                var character = await dbContext.Characters.FindAsync(specRequest.CharacterID);
-                character?.Move(specRequest.Direction);
-                await dbContext.SaveChangesAsync();
-                return new BugScapeResponse(EBugScapeResult.Success);
+        private static async Task HandleUserMessageAsync(JsonClient client,
+                                                       AsyncJsonTcpReactor<BugScapeMessage>.ReactorAction action,
+                                                       BugScapeMessage data) {
+            if (data is BugScapeRequestLogin) {
+                var response = await HandleRequestLoginAsync((BugScapeRequestLogin)data, client);
+                await Reactor.SendDataAsync(client, response);
+            } else if (data is BugScapeRequestRegister) {
+                var response = await HandleRequestRegisterAsync((BugScapeRequestRegister)data);
+                await Reactor.SendDataAsync(client, response);
+            } else if (data is BugScapeRequestMove) {
+                OnlineCharacters[client].Move(((BugScapeRequestMove)data).Direction);
+                await MapUpdated(OnlineCharacters[client].Map);
             }
         }
-        private static async Task<BugScapeResponse> HandleRequestRegisterAsync(BugScapeRequest request) {
+
+        private static async Task<BugScapeMessage> HandleRequestRegisterAsync(BugScapeRequestRegister request) {
             using (var dbContext = new BugScapeDbContext()) {
-                var specRequest = request as BugScapeRequestRegister;
-                if (specRequest == null) return new BugScapeResponse(EBugScapeResult.Error);
+                User createdUser;
 
                 // Critical Section: Cannot let two users try register at the same time
                 await RegistrationLock.WaitAsync();
-                if (
-                await (from user in dbContext.Users where user.Username == specRequest.Username select user).AnyAsync()) {
-                    return new BugScapeResponse(EBugScapeResult.ErrorUserAlreadyExists);
+                try {
+                    if (
+                    await (from user in dbContext.Users where user.Username == request.Username select user).AnyAsync()) {
+                        return new BugScapeResponseRegisterAlreadyExist();
+                    }
+
+                    createdUser = new User {
+                        Username = request.Username,
+                        PasswordSalt = new byte[ServerSettings.PasswordHashSaltLength]
+                    };
+                    new RNGCryptoServiceProvider().GetBytes(createdUser.PasswordSalt);
+                    createdUser.PasswordHash = HashPasswordCalculate(request.Password, createdUser.PasswordSalt);
+
+                    var createdCharacter = new Character {
+                        User = createdUser,
+                        Map = dbContext.Maps.FirstOrDefault(m => m.MapID == 1),
+                        Location = new Point2D()
+                    };
+
+                    dbContext.Characters.Add(createdCharacter);
+                    dbContext.Users.Add(createdUser);
+                    await dbContext.SaveChangesAsync();
+                } finally {
+                    RegistrationLock.Release();
                 }
-
-                var createdUser = new User {
-                    Username = specRequest.Username,
-                    PasswordSalt = new byte[ServerSettings.PasswordHashSaltLength]
-                };
-                new RNGCryptoServiceProvider().GetBytes(createdUser.PasswordSalt);
-                createdUser.PasswordHash = HashPasswordCalculate(specRequest.Password, createdUser.PasswordSalt);
-
-                dbContext.Users.Add(createdUser);
-                await dbContext.SaveChangesAsync();
-                RegistrationLock.Release();
                 // End of critical section
 
                 dbContext.Characters.Add(new Character() {
@@ -83,27 +96,84 @@ namespace BugScape {
                     User = createdUser
                 });
 
-                return new BugScapeResponse(EBugScapeResult.Success);
+                return new BugScapeResponseRegisterSuccessful();
             }
         }
-        private static async Task<BugScapeResponse> HandleRequestLoginAsync(BugScapeRequest request) {
+        private static async Task<BugScapeMessage> HandleRequestLoginAsync(BugScapeRequestLogin request, JsonClient client) {
             using (var dbContext = new BugScapeDbContext()) {
-                var specRequest = request as BugScapeRequestLogin;
-                if (specRequest == null) return new BugScapeResponse(EBugScapeResult.Error);
-
                 var matchingUsers =
                 await
-                (from user in dbContext.Users where user.Username == specRequest.Username select user).Include(user => user.Characters).ToListAsync();
+                (from user in dbContext.Users where user.Username == request.Username select user).ToListAsync();
 
                 if (!matchingUsers.Any()) {
-                    return new BugScapeResponse(EBugScapeResult.ErrorInvalidCredentials);
+                    return new BugScapeResponseLoginInvalidCredentials();
                 }
 
                 var matchingUser = matchingUsers.First();
-                return HashPasswordCompare(specRequest.Password, matchingUser.PasswordSalt, matchingUser.PasswordHash)
-                       ? new BugScapeResponseUser(matchingUser)
-                       : new BugScapeResponse(EBugScapeResult.ErrorInvalidCredentials);
+                if (!HashPasswordCompare(request.Password, matchingUser.PasswordSalt, matchingUser.PasswordHash)) {
+                    return new BugScapeResponseLoginInvalidCredentials();
+                }
+
+                // Critical Section: Cannot let two users try login at the same time
+                await LoginLock.WaitAsync();
+                try {
+                    if (LoggedInUserIDs.Contains(matchingUser.UserID)) {
+                        return new BugScapeResponseLoginAlreadyLoggedIn();
+                    }
+                    LoggedInUserIDs.Add(matchingUser.UserID);
+                } finally {
+                    LoginLock.Release();
+                }
+                // End of critical section
+
+                var character = await LoadCharacter(matchingUser.Characters.First(), client);
+                return new BugScapeResponseLoginSuccessful(character);
             }
+        }
+
+        private static async Task MapUpdated(Map map) {
+            if (map == null) return;
+
+            var update = new BugScapeUpdateMapChanged(map);
+            await Task.WhenAll(map.Characters.Select(character => Reactor.SendDataAsync(character.Client, update)));
+        }
+
+        private static async Task<Character> LoadCharacter(Character character, JsonClient client) {
+            if (OnlineCharacters.ContainsKey(client)) return null; /* Client already has a character online */
+            
+            /* Load character */
+            OnlineCharacters[client] = character.CloneToServer();
+            OnlineCharacters[client].Client = client;
+
+            /* Spawn character */
+            await SpawnCharacterInMap(OnlineCharacters[client], OnlineMaps[character.Map.MapID]);
+
+            await Task.Delay(0); /* To avoid warning */
+            return OnlineCharacters[client];
+        }
+        private static async Task SpawnCharacterInMap(Character character, Map map) {
+            /* Set map to character */
+            character.Map = map;
+
+            /* Add character to map */
+            map.Characters.Add(character);
+
+            /* Send update */
+            await MapUpdated(map);
+
+            await Task.Delay(0); /* To avoid warning */
+        }
+        private static async Task RemoveCharacterFromMap(Character character) {
+            /* Remove character from map */
+            character.Map.Characters.Remove(character);
+
+            /* Send update */
+            await MapUpdated(character.Map);
+
+            /* Remove map from character */
+            character.Map = null;
+
+            await Task.Delay(0); /* To avoid warning */
         }
 
         private static byte[] HashPasswordCalculate(string password, byte[] passwordSalt) {
