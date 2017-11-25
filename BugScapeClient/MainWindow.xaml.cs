@@ -59,7 +59,7 @@ namespace BugScapeClient {
             var tcpClient = new TcpClient(ServerSettings.ServerAddress, ServerSettings.ServerPort);
             tcpClient.NoDelay = true;
             Client = new JsonClient(tcpClient.GetStream());
-            MainWindowPager.SwitchPage(new LoginPage());
+            MainWindowPager.SwitchPage(new Pages.LoginPage());
         }
     }
 
@@ -69,7 +69,7 @@ namespace BugScapeClient {
             this.InitializeComponent();
             MainWindowPager.Window = this;
             ClientConnection.StartReceivingTask();
-            MainWindowPager.SwitchPage(new LoginPage());
+            MainWindowPager.SwitchPage(new Pages.LoginPage());
         }
     }
 }

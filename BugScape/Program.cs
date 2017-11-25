@@ -1,17 +1,21 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using BugScapeCommon;
-using Newtonsoft.Json;
 
 namespace BugScape {
     internal class Program {
-        private static void Main(string[] args) {
+        private static void Main() {
             Console.WriteLine("Hello BugScape!");
-            
-            BugScapeServer.Run().Wait();
+
+            /* Add basic map for testing */
+            using (var dbContext = new BugScapeDbContext()) {
+                if (!dbContext.Maps.Any()) {
+                    dbContext.Maps.Add(new Map {Width = 10, Height = 10, IsNewCharacterMap = true});
+                }
+                dbContext.SaveChanges();
+            }
+
+            new BugScapeServer().Run().Wait();
         }
     }
 }

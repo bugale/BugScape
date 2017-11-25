@@ -1,51 +1,62 @@
 ﻿namespace BugScapeCommon {
+    public enum EDirection {
+        None,
+        Left,
+        Right,
+        Up,
+        Down,
+    }
+
     public class BugScapeMessage { }
-    
+    public class BugScapeMessageUnexpectedError : BugScapeMessage {
+        public string Message { get; set; }
+    }
+
     public class BugScapeRequestLogin : BugScapeMessage {
         public string Username { get; set; }
         public string Password { get; set; }
-
-        public BugScapeRequestLogin(string username, string password) {
-            this.Username = username;
-            this.Password = password;
-        }
     }
-    public class BugScapeRequestRegister : BugScapeMessage {
-        public string Username { get; set; }
-        public string Password { get; set; }
-
-        public BugScapeRequestRegister(string username, string password) {
-            this.Username = username;
-            this.Password = password;
-        }
-    }
-    public class BugScapeRequestMove : BugScapeMessage {
-        public EDirection Direction { get; }
-
-        public BugScapeRequestMove(EDirection direction) {
-            this.Direction = direction;
-        }
-    }
-
     public class BugScapeResponseLoginInvalidCredentials : BugScapeMessage { }
     public class BugScapeResponseLoginAlreadyLoggedIn : BugScapeMessage { }
     public class BugScapeResponseLoginSuccessful : BugScapeMessage {
-        public Character Character { get; set; }
-        public Map Map { get; set; }
+        public User User { get; set; }
+    }
 
-        public BugScapeResponseLoginSuccessful(Character character) {
-            this.Character = character;
-            this.Map = character.Map;
-        }
+    public class BugScapeRequestRegister : BugScapeMessage {
+        public User User { get; set; }
+        public string Password { get; set; }
     }
     public class BugScapeResponseRegisterAlreadyExist : BugScapeMessage{ }
-    public class BugScapeResponseRegisterSuccessful : BugScapeMessage {}
+    public class BugScapeResponseRegisterSuccessful : BugScapeMessage { }
 
-    public class BugScapeUpdateMapChanged : BugScapeMessage {
+    public class BugScapeRequestCharacterRemove : BugScapeMessage {
+        public Character Character { get; set; }
+    }
+    public class BugScapeRequestCharacterRemoveSuccessful : BugScapeMessage {
+        public User User { get; set; }
+    }
+
+    public class BugScapeRequestCharacterCreate : BugScapeMessage {
+        public Character Character { get; set; }
+    }
+    public class BugScapeResponseCharacterCreateAlreadyExist : BugScapeMessage { }
+    public class BugScapeResponseCharacterCreateSuccessful : BugScapeMessage {
+        public User User { get; set; }
+    }
+
+    public class BugScapeRequestCharacterEnter : BugScapeMessage {
+        public Character Character { get; set; }
+    }
+    public class BugScapeResponseCharacterEnterSuccessful : BugScapeMessage {
         public Map Map { get; set; }
+        public Character Character { get; set; }
+    }
 
-        public BugScapeUpdateMapChanged(Map map) {
-            this.Map = map;
-        }
+    public class BugScapeRequestMove : BugScapeMessage {
+        public EDirection Direction { get; set; }
+    }
+
+    public class BugScapeResponseMapChanged : BugScapeMessage {
+        public Map Map { get; set; }
     }
 }

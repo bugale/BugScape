@@ -1,0 +1,19 @@
+﻿<Page x:Class="BugScapeClient.Pages.CharacterCreatePage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:bugScapeCommon="clr-namespace:BugScapeCommon;assembly=BugScapeCommon"
+      xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
+      mc:Ignorable="d"
+      Height="Auto" Width="Auto"
+      Title="CharacterCreatePage">
+    <Grid Margin="10,10,10,10" Height="Auto" Width="Auto" d:DataContext="{d:DesignInstance bugScapeCommon:Character}">
+        <Label Content="DisplayName:" HorizontalAlignment="Left" Margin="0,0,0,0" VerticalAlignment="Top"/>
+        <TextBox x:Name="DisplayNameTextBox" HorizontalAlignment="Left" Height="26" Margin="112,0,0,0" Width="200" VerticalAlignment="Top" MaxLines="1" MaxLength="32"/>
+        <xctk:ColorPicker x:Name="ColorPicker" Margin="112,31,0,81" Height="26"/>
+        <Button x:Name="CreateButton" Content="Create Character" HorizontalAlignment="Left" Margin="0,62,0,0" VerticalAlignment="Top" Width="312" Height="50" Click="CreateButton_Click" FontSize="20" FontWeight="Bold" Foreground="Black" IsDefault="True"/>
+        <Button x:Name="CancelButton" Content="Cancel" HorizontalAlignment="Left" Margin="0,117,0,0" VerticalAlignment="Top" Width="312" Height="21" Click="CancelButton_Click" FontSize="10" Foreground="Red"/>
+        <Label Content="Character Color:" HorizontalAlignment="Left" Margin="0,31,0,0" VerticalAlignment="Top"/>
+    </Grid>
+</Page>

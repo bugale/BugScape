@@ -2,7 +2,7 @@
 using System.Windows;
 using BugScapeCommon;
 
-namespace BugScapeClient {
+namespace BugScapeClient.Pages {
     public partial class LoginPage : ISwitchable {
         public LoginPage() {
             this.InitializeComponent();
@@ -12,7 +12,11 @@ namespace BugScapeClient {
 
         private async void LoginButton_Click(object sender, RoutedEventArgs e) {
             this.IsEnabled = false;
-            await ClientConnection.Client.SendObjectAsync(new BugScapeRequestLogin(this.UsernameTextBox.Text, this.PasswordTextBox.Password));
+            await
+            ClientConnection.Client.SendObjectAsync(new BugScapeRequestLogin {
+                Username = this.UsernameTextBox.Text,
+                Password = this.PasswordTextBox.Password
+            });
         }
 
         private void RegisterButton_Click(object sender, RoutedEventArgs e) {
@@ -21,12 +25,15 @@ namespace BugScapeClient {
 
         private async Task HandleServerResponse(BugScapeMessage message) {
             if (message is BugScapeResponseLoginSuccessful) {
-                MainWindowPager.SwitchPage(new GamePage(((BugScapeResponseLoginSuccessful)message).Map, ((BugScapeResponseLoginSuccessful)message).Character));
+                MainWindowPager.SwitchPage(new CharacterSelectPage(((BugScapeResponseLoginSuccessful)message).User));
             } else if (message is BugScapeResponseLoginInvalidCredentials) {
                 MessageBox.Show("Invalid credentials");
                 this.IsEnabled = true;
             } else if (message is BugScapeResponseLoginAlreadyLoggedIn) {
                 MessageBox.Show("User is already logged in");
+                this.IsEnabled = true;
+            } else if (message is BugScapeMessageUnexpectedError) {
+                MessageBox.Show(((BugScapeMessageUnexpectedError)message).Message);
                 this.IsEnabled = true;
             }
 

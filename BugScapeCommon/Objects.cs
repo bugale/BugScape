@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Net.Sockets;
+using System.Linq;
 using Newtonsoft.Json;
 
 namespace BugScapeCommon {
@@ -27,9 +27,28 @@ namespace BugScapeCommon {
 
         public bool IsInsideRectangle(Point2D point2) { return this.IsInsideRectangle(new Point2D(0, 0), point2); }
 
-        public Point2D CloneToServer() {
-            return new Point2D(this);
+        public Point2D CloneToServer() { return new Point2D(this); }
+    }
+
+    [ComplexType]
+    public class RgbColor {
+        public RgbColor() {
+            this.R = 0;
+            this.G = 0;
+            this.B = 0;
         }
+        public RgbColor(byte r, byte g, byte b) {
+            this.R = r;
+            this.G = g;
+            this.B = b;
+        }
+        public RgbColor(RgbColor color) : this(color.R, color.G, color.B) { }
+
+        public byte R { get; set; }
+        public byte G { get; set; }
+        public byte B { get; set; }
+
+        public RgbColor CloneToServer() { return new RgbColor(this); }
     }
 
     public class Map {
@@ -39,16 +58,28 @@ namespace BugScapeCommon {
         public int Width { get; set; }
         public int Height { get; set; }
 
+        public bool IsNewCharacterMap { get; set; }
+
         public virtual ICollection<Character> Characters { get; set; }
         
         public Map CloneToServer() {
-            return new Map { MapID = this.MapID, Width = this.Width, Height = this.Height };
+            return new Map {
+                MapID = this.MapID,
+                Width = this.Width,
+                Height = this.Height,
+                IsNewCharacterMap = this.IsNewCharacterMap
+            };
         }
     }
 
     public class Character {
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int CharacterID { get; set; }
+
+        [Index(IsUnique = true), MinLength(6), MaxLength(32), RegularExpression(@"[0-9a-zA-Z_\!\@\#\$\%\^\&\*\-\=\+]*")]
+        public string DisplayName { get; set; }
+        
+        public RgbColor Color { get; set; }
 
         public Point2D Location { get; set; }
 
@@ -58,12 +89,13 @@ namespace BugScapeCommon {
         [JsonIgnore]
         public virtual User User { get; set; }
 
-        [JsonIgnore]
-        [NotMapped]
-        public JsonClient Client { get; set; }
-
         public Character CloneToServer() {
-            return new Character {CharacterID = this.CharacterID, User = this.User.CloneToServer(), Location = this.Location.CloneToServer()};
+            return new Character {
+                CharacterID = this.CharacterID,
+                DisplayName = this.DisplayName,
+                Location = this.Location.CloneToServer(),
+                Color = this.Color.CloneToServer()
+            };
         }
 
         public void Move(EDirection direction) {
@@ -97,18 +129,23 @@ namespace BugScapeCommon {
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int UserID { get; set; }
 
-        [Index(IsUnique = true)]
-        [MaxLength(256)]
+        [Index(IsUnique = true), MinLength(6), MaxLength(32), RegularExpression(@"[0-9a-zA-Z_\!\@\#\$\%\^\&\*\-\=\+]*")]
         public string Username { get; set; }
 
         [JsonIgnore]
+        [MaxLength(1024)]
         public byte[] PasswordHash { get; set; }
 
         [JsonIgnore]
+        [MaxLength(1024)]
         public byte[] PasswordSalt { get; set; }
 
         public User CloneToServer() {
-            return new User { UserID = this.UserID, Username = this.Username };
+            return new User {
+                UserID = this.UserID,
+                Username = this.Username,
+                Characters = new List<Character>(this.Characters.Select(character => character.CloneToServer()))
+            };
         }
 
         public virtual ICollection<Character> Characters { get; set; }
