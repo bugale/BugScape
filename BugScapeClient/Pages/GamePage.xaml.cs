@@ -61,11 +61,11 @@ namespace BugScapeClient.Pages {
             this.MapCanvas.Children.Clear();
 
             /* Set map margins */
-            this.MapCanvas.Margin = new Thickness(ClientSettings.GuiTileX, ClientSettings.GuiTileY, ClientSettings.GuiTileX, ClientSettings.GuiTileY);
+            this.MapCanvas.Margin = new Thickness(0, 0, 0, 0);
 
             /* Set map size */
-            this.MapCanvas.Width = this.Map.Width * ClientSettings.GuiTileX;
-            this.MapCanvas.Height = this.Map.Height * ClientSettings.GuiTileY;
+            this.MapCanvas.Width = this.Map.Width;
+            this.MapCanvas.Height = this.Map.Height;
 
             /* Draw characters */
             foreach (var character in this.Map.Characters) {
@@ -73,11 +73,11 @@ namespace BugScapeClient.Pages {
                 var characterFigure = new Ellipse {
                     Fill = new SolidColorBrush(Color.FromRgb(character.Color.R, character.Color.G, character.Color.B)),
                     Stroke = new SolidColorBrush(Color.FromRgb(0, 0, 0)),
-                    Width = ClientSettings.GuiTileX,
-                    Height = ClientSettings.GuiTileY
+                    Width = ClientSettings.CharacterSizeX,
+                    Height = ClientSettings.CharacterSizeY
                 };
-                Canvas.SetLeft(characterFigure, character.Location.X*ClientSettings.GuiTileX);
-                Canvas.SetTop(characterFigure, character.Location.Y*ClientSettings.GuiTileY);
+                Canvas.SetLeft(characterFigure, character.Location.X);
+                Canvas.SetTop(characterFigure, character.Location.Y);
                 this.MapCanvas.Children.Add(characterFigure);
 
                 /* Draw display name */
@@ -88,9 +88,9 @@ namespace BugScapeClient.Pages {
                 displayNameLabel.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
 
                 Canvas.SetLeft(displayNameLabel,
-                               character.Location.X*ClientSettings.GuiTileX - 0.5*displayNameLabel.DesiredSize.Width +
+                               character.Location.X - 0.5*displayNameLabel.DesiredSize.Width +
                                0.5*characterFigure.Width); /* Set it centered horizontally */
-                Canvas.SetTop(displayNameLabel, (character.Location.Y + 1) * ClientSettings.GuiTileY); /* Set it below the figure */
+                Canvas.SetTop(displayNameLabel, character.Location.Y + characterFigure.Height); /* Set it below the figure */
                 this.MapCanvas.Children.Add(displayNameLabel);
             }
         }
