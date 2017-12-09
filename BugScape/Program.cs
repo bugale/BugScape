@@ -10,7 +10,7 @@ namespace BugScape {
             /* Add basic map for testing */
             using (var dbContext = new BugScapeDbContext()) {
                 if (!dbContext.Maps.Any()) {
-                    dbContext.Maps.Add(new Map {Width = 10, Height = 10, IsNewCharacterMap = true});
+                    dbContext.Maps.Add(new Map {Width = 500, Height = 500, IsNewCharacterMap = true});
                 }
                 dbContext.SaveChanges();
             }

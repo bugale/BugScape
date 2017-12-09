@@ -54,6 +54,7 @@
 
     public class BugScapeRequestMove : BugScapeMessage {
         public EDirection Direction { get; set; }
+        public bool MoveMax { get; set; }
     }
 
     public class BugScapeResponseMapChanged : BugScapeMessage {

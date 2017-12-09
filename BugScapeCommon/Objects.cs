@@ -12,14 +12,14 @@ namespace BugScapeCommon {
             this.X = 0;
             this.Y = 0;
         }
-        public Point2D(int x, int y) {
+        public Point2D(double x, double y) {
             this.X = x;
             this.Y = y;
         }
         public Point2D(Point2D point) : this(point.X, point.Y) { }
 
-        public int X { get; set; }
-        public int Y { get; set; }
+        public double X { get; set; }
+        public double Y { get; set; }
 
         public bool IsInsideRectangle(Point2D point1, Point2D point2) {
             return this.X <= point2.X && this.X >= point1.X && this.Y <= point2.Y && this.Y >= point1.Y;
@@ -83,6 +83,11 @@ namespace BugScapeCommon {
 
         public Point2D Location { get; set; }
 
+        public double Speed { get; set; }
+
+        [NotMapped]
+        public DateTime LastMoveTime { get; set; }
+
         [JsonIgnore]
         public virtual Map Map { get; set; }
 
@@ -94,24 +99,38 @@ namespace BugScapeCommon {
                 CharacterID = this.CharacterID,
                 DisplayName = this.DisplayName,
                 Location = this.Location.CloneToServer(),
-                Color = this.Color.CloneToServer()
+                Color = this.Color.CloneToServer(),
+                Speed = this.Speed,
+                LastMoveTime = DateTime.Now
             };
         }
 
-        public void Move(EDirection direction) {
+        public void Move(EDirection direction, bool moveMax) {
             var destination = new Point2D(this.Location);
+            var amount = 0.0;
+            var max = this.Speed*(DateTime.Now - this.LastMoveTime).TotalSeconds;
+
+            if (moveMax) {
+                /* Validate that there was no too much time since the last move */
+                if (DateTime.Now - this.LastMoveTime <= TimeSpan.FromMilliseconds(500)) {
+                    amount = max;
+                }
+            } else {
+                amount = Math.Min(1, max);
+            }
+
             switch (direction) {
             case EDirection.Down:
-                destination.Y += 1;
+                destination.Y += amount;
                 break;
             case EDirection.Left:
-                destination.X -= 1;
+                destination.X -= amount;
                 break;
             case EDirection.Right:
-                destination.X += 1;
+                destination.X += amount;
                 break;
             case EDirection.Up:
-                destination.Y -= 1;
+                destination.Y -= amount;
                 break;
             case EDirection.None:
                 break;
@@ -119,7 +138,9 @@ namespace BugScapeCommon {
                 throw new ArgumentOutOfRangeException(nameof(direction), direction, null);
             }
 
-            if (destination.IsInsideRectangle(new Point2D(this.Map.Width - 1, this.Map.Height - 1))) {
+            this.LastMoveTime = DateTime.Now;
+
+            if (destination.IsInsideRectangle(new Point2D(this.Map.Width, this.Map.Height))) {
                 this.Location = destination;
             }
         }

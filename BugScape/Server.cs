@@ -219,7 +219,8 @@ namespace BugScape {
                         Color = request.Character.Color,
                         User = matchingUser,
                         Map = spawnMap,
-                        Location = new Point2D(0, 0)
+                        Location = new Point2D(0, 0),
+                        Speed = 50
                     });
                     await dbContext.SaveChangesAsync();
                 } finally {
@@ -298,7 +299,7 @@ namespace BugScape {
         }
         private async Task<BugScapeMessage> HandleRequestMoveAsync(BugScapeMessage data, JsonClient client) {
             var request = (BugScapeRequestMove)data;
-            this._clients[client]?.Character?.Move(request.Direction);
+            this._clients[client]?.Character?.Move(request.Direction, request.MoveMax);
             await this.MapUpdated(this._clients[client]?.Character?.Map);
             return null;
         }
