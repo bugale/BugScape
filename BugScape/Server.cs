@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Data.Entity;
 using System.Linq;
 using System.Net;
-using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using BugScapeCommon;
@@ -115,7 +115,10 @@ namespace BugScape {
             }
 
             /* Run reactor */
-            await this._reactor.RunServerAsync(IPAddress.Any, ServerSettings.ServerPort);
+            var conn =
+            new BugscapeServerConnStrBuilder(
+            ConfigurationManager.ConnectionStrings["BugScapeServerConnStr"].ConnectionString);
+            await this._reactor.RunServerAsync(IPAddress.Parse(conn.Server), conn.Port);
         }
 
         private async Task HandleUserDisconnectionAsync(JsonClient client,
@@ -151,10 +154,8 @@ namespace BugScape {
 
                     var createdUser = new User {
                         Username = request.User.Username,
-                        PasswordSalt = new byte[ServerSettings.PasswordHashSaltLength]
+                        Password = new HashedPassword(request.Password)
                     };
-                    new RNGCryptoServiceProvider().GetBytes(createdUser.PasswordSalt);
-                    createdUser.PasswordHash = HashPasswordCalculate(request.Password, createdUser.PasswordSalt);
 
                     dbContext.Users.Add(createdUser);
                     await dbContext.SaveChangesAsync();
@@ -175,7 +176,7 @@ namespace BugScape {
                     return new BugScapeResponseLoginInvalidCredentials();
                 }
                 
-                if (!HashPasswordCompare(request.Password, matchingUser.PasswordSalt, matchingUser.PasswordHash)) {
+                if (!matchingUser.Password.Compare(request.Password)) {
                     return new BugScapeResponseLoginInvalidCredentials();
                 }
 
@@ -341,21 +342,6 @@ namespace BugScape {
             character.Map = null;
 
             await Task.Delay(0); /* To avoid warning */
-        }
-
-        private static byte[] HashPasswordCalculate(string password, byte[] passwordSalt) {
-            var hash = new Rfc2898DeriveBytes(password, passwordSalt) {
-                IterationCount = ServerSettings.PasswordHashIterations
-            };
-            return hash.GetBytes(ServerSettings.PasswordHashLength);
-        }
-        private static bool HashPasswordCompare(string password, byte[] passwordSalt, byte[] passwordHash) {
-            var hashed = HashPasswordCalculate(password, passwordSalt);
-
-            // Check every byte to eliminate comparing time attacks
-            var diff = passwordHash.Length ^ hashed.Length;
-            for (var i = 0; i < passwordHash.Length && i < hashed.Length; i++) diff |= passwordHash[i] ^ hashed[i];
-            return diff == 0;
         }
 
         private delegate Task<BugScapeMessage> UserMessageHandler(BugScapeMessage data, JsonClient client);

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
+using System.Security.Cryptography;
 using Newtonsoft.Json;
 
 namespace BugScapeCommon {
@@ -101,6 +102,54 @@ namespace BugScapeCommon {
         public byte B { get; set; }
 
         public RgbColor CloneFromDatabase() { return new RgbColor(this); }
+    }
+
+    [ComplexType]
+    public class HashedPassword {
+        private const int Iterations = 1024;
+        private const int HashLength = 128;
+        private const int SaltLength = 128;
+
+        public HashedPassword() {
+            this.Hash = new byte[] {};
+            this.Salt = new byte[] {};
+        }
+        public HashedPassword(byte[] hash, byte[] salt) {
+            this.Hash = (byte[])hash.Clone();
+            this.Salt = (byte[])salt.Clone();
+        }
+        public HashedPassword(string password) {
+            this.Salt = new byte[SaltLength];
+            new RNGCryptoServiceProvider().GetBytes(this.Salt);
+            this.Hash = HashPasswordCalculate(password, this.Salt);
+        }
+        public HashedPassword(HashedPassword hashedPassword) : this(hashedPassword.Hash, hashedPassword.Salt) { }
+
+        [JsonIgnore]
+        [MaxLength(1024)]
+        public byte[] Hash { get; set; }
+
+        [JsonIgnore]
+        [MaxLength(1024)]
+        public byte[] Salt { get; set; }
+
+        public HashedPassword CloneFromDatabase() { return new HashedPassword(this); }
+
+        private static byte[] HashPasswordCalculate(string password, byte[] passwordSalt) {
+            var hash = new Rfc2898DeriveBytes(password, passwordSalt) {
+                IterationCount = Iterations
+            };
+            return hash.GetBytes(HashLength);
+        }
+        
+        public bool Compare(string password) {
+            var hashedTry = HashPasswordCalculate(password, this.Salt);
+
+            // Check every byte to eliminate comparing time attacks
+            var diff = this.Hash.Length ^ hashedTry.Length;
+            for (var i = 0; i < this.Hash.Length && i < hashedTry.Length; i++) diff |= this.Hash[i] ^ hashedTry[i];
+            return diff == 0;
+        }
     }
 
     public abstract class DatabaseObject {
@@ -288,13 +337,7 @@ namespace BugScapeCommon {
         [Index(IsUnique = true), MinLength(6), MaxLength(32), RegularExpression(@"[0-9a-zA-Z_\!\@\#\$\%\^\&\*\-\=\+]*")]
         public string Username { get; set; }
 
-        [JsonIgnore]
-        [MaxLength(1024)]
-        public byte[] PasswordHash { get; set; }
-
-        [JsonIgnore]
-        [MaxLength(1024)]
-        public byte[] PasswordSalt { get; set; }
+        public HashedPassword Password { get; set; }
 
         public virtual ICollection<Character> Characters { get; set; }
         

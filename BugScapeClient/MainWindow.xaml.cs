@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Configuration;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
@@ -56,8 +57,10 @@ namespace BugScapeClient {
 
         private static void Connect() {
             Client?.Close();
-            var tcpClient = new TcpClient(ServerSettings.ServerAddress, ServerSettings.ServerPort);
-            tcpClient.NoDelay = true;
+            var conn =
+            new BugscapeServerConnStrBuilder(
+            ConfigurationManager.ConnectionStrings["BugScapeServerConnStr"].ConnectionString);
+            var tcpClient = new TcpClient(conn.Server, conn.Port) {NoDelay = true};
             Client = new JsonClient(tcpClient.GetStream());
             MainWindowPager.SwitchPage(new Pages.LoginPage());
         }
