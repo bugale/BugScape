@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -16,7 +15,7 @@ namespace BugScapeClient.Pages {
         private Character Character { get; }
         private bool _shouldRedraw;
         private readonly DispatcherTimer _redrawTimer = new DispatcherTimer {Interval = TimeSpan.FromMilliseconds(10)};
-        private readonly DispatcherTimer _moveTimer = new DispatcherTimer  {Interval = TimeSpan.FromMilliseconds(50)};
+        private readonly DispatcherTimer _moveTimer = new DispatcherTimer {Interval = TimeSpan.FromMilliseconds(50)};
         private EDirection _moveDirection = EDirection.None;
 
         private static readonly Dictionary<Key, EDirection> KeyDictionary = new Dictionary<Key, EDirection> {
@@ -102,8 +101,30 @@ namespace BugScapeClient.Pages {
             this.MapCanvas.Margin = new Thickness(0, 0, 0, 0);
 
             /* Set map size */
-            this.MapCanvas.Width = map.Width;
-            this.MapCanvas.Height = map.Height;
+            this.MapCanvas.Width = map.Size.X;
+            this.MapCanvas.Height = map.Size.Y;
+
+            /* Draw map objects */
+            foreach (var mapObject in map.MapObjects) {
+                UIElement objectVisual = null;
+
+                if (mapObject is MapWall) {
+                    /* Draw wall */
+                    objectVisual = new Rectangle {
+                        Fill =
+                            new SolidColorBrush(Color.FromRgb(((MapWall)mapObject).Color.R, ((MapWall)mapObject).Color.G,
+                                                              ((MapWall)mapObject).Color.B)),
+                        Stroke = new SolidColorBrush(Color.FromRgb(0, 0, 0)),
+                        Width = mapObject.Size.X,
+                        Height = mapObject.Size.Y
+                    };
+                }
+
+                if (objectVisual == null) continue;
+                Canvas.SetLeft(objectVisual, mapObject.Location.X);
+                Canvas.SetTop(objectVisual, mapObject.Location.Y);
+                this.MapCanvas.Children.Add(objectVisual);
+            }
 
             /* Draw characters */
             foreach (var character in map.Characters) {
@@ -112,8 +133,8 @@ namespace BugScapeClient.Pages {
                     Fill =
                         new SolidColorBrush(Color.FromRgb(character.Color.R, character.Color.G, character.Color.B)),
                     Stroke = new SolidColorBrush(Color.FromRgb(0, 0, 0)),
-                    Width = ClientSettings.CharacterSizeX,
-                    Height = ClientSettings.CharacterSizeY
+                    Width = character.Size.X,
+                    Height = character.Size.Y
                 };
                 Canvas.SetLeft(characterFigure, character.Location.X);
                 Canvas.SetTop(characterFigure, character.Location.Y);

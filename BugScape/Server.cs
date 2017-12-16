@@ -20,29 +20,29 @@ namespace BugScape {
 
         public ClientState this[User user]
             =>
-            user != null && this._statesByUserID.ContainsKey(user.UserID)
-            ? this._statesByUserID[user.UserID].Clone()
+            user != null && this._statesByUserID.ContainsKey(user.ID)
+            ? this._statesByUserID[user.ID].Clone()
             : null;
 
         public ClientState this[Character character]
             =>
-            character != null && this._statesByCharacterID.ContainsKey(character.CharacterID)
-            ? this._statesByCharacterID[character.CharacterID].Clone()
+            character != null && this._statesByCharacterID.ContainsKey(character.ID)
+            ? this._statesByCharacterID[character.ID].Clone()
             : null;
 
         private void _remove(ClientState clientState) {
             if (this._statesByClient.ContainsKey(clientState.Client)) this._statesByClient.Remove(clientState.Client);
             if (clientState.Character != null &&
-                this._statesByCharacterID.ContainsKey(clientState.Character.CharacterID)) this._statesByCharacterID.Remove(clientState.Character.CharacterID);
-            if (clientState.User != null && this._statesByUserID.ContainsKey(clientState.User.UserID)) this._statesByUserID.Remove(clientState.User.UserID);
+                this._statesByCharacterID.ContainsKey(clientState.Character.ID)) this._statesByCharacterID.Remove(clientState.Character.ID);
+            if (clientState.User != null && this._statesByUserID.ContainsKey(clientState.User.ID)) this._statesByUserID.Remove(clientState.User.ID);
         }
 
         private void _updateClient(ClientState clientState) {
             this._remove(clientState); /* Remove if exists */
             var clone = clientState.Clone();
             this._statesByClient[clientState.Client] = clone;
-            if (clone.Character != null) this._statesByCharacterID[clone.Character.CharacterID] = clone;
-            if (clone.User != null) this._statesByUserID[clone.User.UserID] = clone;
+            if (clone.Character != null) this._statesByCharacterID[clone.Character.ID] = clone;
+            if (clone.User != null) this._statesByUserID[clone.User.ID] = clone;
         }
 
         public void AddClient(JsonClient client) { this._updateClient(new ClientState(client)); }
@@ -107,9 +107,10 @@ namespace BugScape {
 
             /* Load all maps */
             using (var dbContext = new BugScapeDbContext()) {
-                foreach (var map in dbContext.Maps) {
-                    this._onlineMaps[map.MapID] = map.CloneToServer();
-                    this._onlineMaps[map.MapID].Characters = new List<Character>();
+                /* Convert to list here to prevent database access inside loop from interfering with the maps request */
+                foreach (var map in await dbContext.Maps.ToListAsync()) {
+                    this._onlineMaps[map.ID] = (Map)map.CloneFromDatabase();
+                    this._onlineMaps[map.ID].Characters = new List<Character>();
                 }
             }
 
@@ -185,7 +186,7 @@ namespace BugScape {
                         return new BugScapeResponseLoginAlreadyLoggedIn();
                     }
                     this._clients.AddClient(client);
-                    this._clients.UpdateClient(this._clients[client], matchingUser.CloneToServer());
+                    this._clients.UpdateClient(this._clients[client], (User)matchingUser.CloneFromDatabase());
                 } finally {
                     this._loginLock.Release();
                 }
@@ -203,7 +204,7 @@ namespace BugScape {
 
             using (var dbContext = new BugScapeDbContext()) {
                 var loggedUser = this._clients[client].User;
-                var matchingUser = await dbContext.Users.FirstAsync(user => user.UserID == loggedUser.UserID);
+                var matchingUser = await dbContext.Users.FirstAsync(user => user.ID == loggedUser.ID);
                 var spawnMap = await dbContext.Maps.FirstAsync(map => map.IsNewCharacterMap);
 
                 // Critical Section: Cannot let two users try create character at the same time
@@ -219,7 +220,8 @@ namespace BugScape {
                         Color = request.Character.Color,
                         User = matchingUser,
                         Map = spawnMap,
-                        Location = new Point2D(0, 0),
+                        Location = new Point2D(1, 1),
+                        Size = new Point2D(50, 50),
                         Speed = 50
                     });
                     await dbContext.SaveChangesAsync();
@@ -228,7 +230,7 @@ namespace BugScape {
                 }
                 // End of critical section
 
-                this._clients.UpdateClient(this._clients[client], matchingUser.CloneToServer());
+                this._clients.UpdateClient(this._clients[client], (User)matchingUser.CloneFromDatabase());
             }
 
             return new BugScapeResponseCharacterCreateSuccessful {User = this._clients[client].User};
@@ -243,19 +245,19 @@ namespace BugScape {
             if (
             this._clients[client].User.Characters.All(
                                                       character =>
-                                                      character.CharacterID != request.Character.CharacterID)) {
+                                                      character.ID != request.Character.ID)) {
                 return new BugScapeMessageUnexpectedError {Message = "Character not found"};
             }
 
             using (var dbContext = new BugScapeDbContext()) {
                 var matchingCharacter =
                 await
-                dbContext.Characters.FirstAsync(character => character.CharacterID == request.Character.CharacterID);
+                dbContext.Characters.FirstAsync(character => character.ID == request.Character.ID);
                 dbContext.Characters.Remove(matchingCharacter);
                 await dbContext.SaveChangesAsync();
                 var oldUser = this._clients[client].User;
-                var newUser = await dbContext.Users.FirstAsync(user => user.UserID == oldUser.UserID);
-                this._clients.UpdateClient(this._clients[client], newUser.CloneToServer());
+                var newUser = await dbContext.Users.FirstAsync(user => user.ID == oldUser.ID);
+                this._clients.UpdateClient(this._clients[client], (User)newUser.CloneFromDatabase());
             }
 
             return new BugScapeRequestCharacterRemoveSuccessful() { User = this._clients[client].User };
@@ -273,22 +275,22 @@ namespace BugScape {
             if (
             this._clients[client].User.Characters.All(
                                                       character =>
-                                                      character.CharacterID != request.Character.CharacterID)) {
+                                                      character.ID != request.Character.ID)) {
                 return new BugScapeMessageUnexpectedError {Message = "Character not found"};
             }
 
             this._clients.UpdateClient(this._clients[client],
                                        this._clients[client].User.Characters.First(
                                                                                    character =>
-                                                                                   character.CharacterID ==
-                                                                                   request.Character.CharacterID));
+                                                                                   character.ID ==
+                                                                                   request.Character.ID));
 
             int mapID;
             using (var dbContext = new BugScapeDbContext()) {
                 var matchingCharacter =
                 await
-                dbContext.Characters.FirstAsync(character => character.CharacterID == request.Character.CharacterID);
-                mapID = matchingCharacter.Map.MapID;
+                dbContext.Characters.FirstAsync(character => character.ID == request.Character.ID);
+                mapID = matchingCharacter.Map.ID;
             }
             await this.SpawnCharacterInMap(this._clients[client].Character, this._onlineMaps[mapID]);
             
