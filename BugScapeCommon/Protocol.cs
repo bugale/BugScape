@@ -56,7 +56,12 @@
         public EDirection Direction { get; set; }
         public bool MoveMax { get; set; }
     }
+    public class BugscapeRequestUsePortal : BugScapeMessage { }
 
+    public class BugScapeResponseCharacterChanged : BugScapeMessage {
+        public Map Map { get; set; }
+        public Character Character { get; set; }
+    }
     public class BugScapeResponseMapChanged : BugScapeMessage {
         public Map Map { get; set; }
     }

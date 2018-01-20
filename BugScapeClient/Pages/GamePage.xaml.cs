@@ -12,7 +12,7 @@ using BugScapeCommon;
 namespace BugScapeClient.Pages {
     public partial class GamePage : ISwitchable {
         private Map Map { get; set; }
-        private Character Character { get; }
+        private Character Character { get; set; }
         private bool _shouldRedraw;
         private readonly DispatcherTimer _redrawTimer = new DispatcherTimer {Interval = TimeSpan.FromMilliseconds(10)};
         private readonly DispatcherTimer _moveTimer = new DispatcherTimer {Interval = TimeSpan.FromMilliseconds(50)};
@@ -53,6 +53,10 @@ namespace BugScapeClient.Pages {
             if (message is BugScapeResponseMapChanged) {
                 this.Map = ((BugScapeResponseMapChanged)message).Map;
                 this._shouldRedraw = true;
+            } else if (message is BugScapeResponseCharacterChanged) {
+                this.Character = ((BugScapeResponseCharacterChanged)message).Character;
+                this.Map = ((BugScapeResponseCharacterChanged)message).Map;
+                this._shouldRedraw = true;
             } else if (message is BugScapeMessageUnexpectedError) {
                 MessageBox.Show(((BugScapeMessageUnexpectedError)message).Message);
             }
@@ -62,13 +66,13 @@ namespace BugScapeClient.Pages {
         }
 
         private async void OnKeyDown(object sender, KeyEventArgs args) {
+            // Ignore repetitions
             if (args.IsRepeat) {
                 return;
             }
-            if (!KeyDictionary.ContainsKey(args.Key)) {
-                this._moveDirection = EDirection.None;
-                this._moveTimer.Stop();
-            } else {
+
+            // Handle regular movements
+            if (KeyDictionary.ContainsKey(args.Key)) {
                 this._moveDirection = KeyDictionary[args.Key];
                 await
                 ClientConnection.Client.SendObjectAsync(new BugScapeRequestMove {
@@ -76,9 +80,19 @@ namespace BugScapeClient.Pages {
                     MoveMax = false
                 });
                 this._moveTimer.Start();
+            } else {
+                this._moveDirection = EDirection.None;
+                this._moveTimer.Stop();
+            }
+
+            // Handle other keys
+            if (args.Key == Key.Space) {
+                // Use portal
+                await ClientConnection.Client.SendObjectAsync(new BugscapeRequestUsePortal());
             }
         }
         public void OnKeyUp(object sender, KeyEventArgs args) {
+            // Stop regular movement if there was one
             this._moveDirection = EDirection.None;
             this._moveTimer.Stop();
         }
@@ -104,25 +118,40 @@ namespace BugScapeClient.Pages {
             this.MapCanvas.Width = map.Size.X;
             this.MapCanvas.Height = map.Size.Y;
 
-            /* Draw map objects */
-            foreach (var mapObject in map.MapObjects) {
+            /* Draw map obstacles */
+            foreach (var mapObstacle in map.MapObstacles) {
                 UIElement objectVisual = null;
 
-                if (mapObject is MapWall) {
+                if (mapObstacle is MapWall) {
                     /* Draw wall */
                     objectVisual = new Rectangle {
                         Fill =
-                            new SolidColorBrush(Color.FromRgb(((MapWall)mapObject).Color.R, ((MapWall)mapObject).Color.G,
-                                                              ((MapWall)mapObject).Color.B)),
+                            new SolidColorBrush(Color.FromRgb(((MapWall)mapObstacle).Color.R, ((MapWall)mapObstacle).Color.G,
+                                                              ((MapWall)mapObstacle).Color.B)),
                         Stroke = new SolidColorBrush(Color.FromRgb(0, 0, 0)),
-                        Width = mapObject.Size.X,
-                        Height = mapObject.Size.Y
+                        Width = mapObstacle.Size.X,
+                        Height = mapObstacle.Size.Y
                     };
                 }
 
                 if (objectVisual == null) continue;
-                Canvas.SetLeft(objectVisual, mapObject.Location.X);
-                Canvas.SetTop(objectVisual, mapObject.Location.Y);
+                Canvas.SetLeft(objectVisual, mapObstacle.Location.X);
+                Canvas.SetTop(objectVisual, mapObstacle.Location.Y);
+                this.MapCanvas.Children.Add(objectVisual);
+            }
+
+            /* Draw portals */
+            foreach (var portal in map.Portals) {
+                var objectVisual = new Rectangle {
+                    Fill =
+                        new SolidColorBrush(Color.FromRgb(0, 128, 255)),
+                    Stroke = new SolidColorBrush(Color.FromRgb(0, 0, 0)),
+                    Width = portal.Size.X,
+                    Height = portal.Size.Y
+                };
+                
+                Canvas.SetLeft(objectVisual, portal.Location.X);
+                Canvas.SetTop(objectVisual, portal.Location.Y);
                 this.MapCanvas.Children.Add(objectVisual);
             }
 

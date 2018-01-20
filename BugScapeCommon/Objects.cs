@@ -69,15 +69,33 @@ namespace BugScapeCommon {
         public Point2D C => new Point2D(this.XMin, this.YMax);
         public Point2D D => new Point2D(this.XMax, this.YMax);
 
+        public double Area => (this.XMax - this.XMin)*(this.YMax - this.YMin);
+
         public bool IsCollidingWith(Rect2D r) {
             return this.YMin <= r.YMax && this.YMax >= r.YMin && this.XMin <= r.XMax && this.XMax >= r.XMin;
         }
+        public double CoveragePercentage(Rect2D r) { return (this & r).Area/Math.Min(this.Area, r.Area); }
 
+        // Move a rectangle using a point
         public static Rect2D operator +(Rect2D a, Point2D b) {
             return new Rect2D(a.X1 + b.X, a.X2 + b.X, a.Y1 + b.Y, a.Y2 + b.Y);
         }
         public static Rect2D operator -(Rect2D a, Point2D b) {
             return new Rect2D(a.X1 - b.X, a.X2 - b.X, a.Y1 - b.Y, a.Y2 - b.Y);
+        }
+
+        // Intersection
+        public static Rect2D operator &(Rect2D a, Rect2D b) {
+            var xMin = Math.Max(a.XMin, b.XMin);
+            var xMax = Math.Min(a.XMax, b.XMax);
+            var yMin = Math.Max(a.YMin, b.YMin);
+            var yMax = Math.Min(a.YMax, b.YMax);
+
+            if (xMin > xMax || yMin > yMax) {
+                return new Rect2D(0, 0, 0, 0); // No intersection
+            }
+
+            return new Rect2D(xMin, xMax, yMin, yMax);
         }
 
         public Rect2D CloneFromDatabase() { return new Rect2D(this); }
@@ -167,8 +185,6 @@ namespace BugScapeCommon {
     public abstract class MapObject : DatabaseObject {
         public Point2D Size { get; set; }
         public Point2D Location { get; set; }
-        
-        public virtual bool IsBlocking { get; set; }
 
         [JsonIgnore]
         public virtual Map Map { get; set; }
@@ -180,12 +196,34 @@ namespace BugScapeCommon {
         protected override DatabaseObject CopyFromDatabase(DatabaseObject o) {
             this.Location = ((MapObject)o).Location.CloneFromDatabase();
             this.Size = ((MapObject)o).Size.CloneFromDatabase();
-            this.IsBlocking = ((MapObject)o).IsBlocking;
             return base.CopyFromDatabase(o);
         }
     }
 
-    public class MapWall : MapObject {
+    public abstract class MapObstacle : MapObject {
+        public virtual bool IsBlocking { get; set; }
+
+        protected override DatabaseObject CopyFromDatabase(DatabaseObject o) {
+            this.IsBlocking = ((MapObstacle)o).IsBlocking;
+            return base.CopyFromDatabase(o);
+        }
+    }
+
+    public class Portal : MapObject {
+        [JsonIgnore]
+        public virtual Portal DestPortal { get; set; }
+
+        public bool IsDefaultSpawnable { get; set; }
+
+        protected override DatabaseObject CopyFromDatabase(DatabaseObject o) {
+            this.IsDefaultSpawnable = ((Portal)o).IsDefaultSpawnable;
+            return base.CopyFromDatabase(o);
+        }
+
+        public override DatabaseObject CloneFromDatabase() { return new Portal().CopyFromDatabase(this); }
+    }
+
+    public class MapWall : MapObstacle {
         public RgbColor Color { get; set; }
 
         protected override DatabaseObject CopyFromDatabase(DatabaseObject o) {
@@ -203,7 +241,12 @@ namespace BugScapeCommon {
 
         public virtual ICollection<Character> Characters { get; set; }
 
-        public virtual ICollection<MapObject> MapObjects { get; set; }
+        public virtual ICollection<MapObstacle> MapObstacles { get; set; }
+
+        public virtual ICollection<Portal> Portals { get; set; }
+
+        [NotMapped] [JsonIgnore] public ICollection<Portal> DefaultSpawnablePortals
+            => this.Portals.Where(x => x.IsDefaultSpawnable).ToList();
 
         [NotMapped] [JsonIgnore] public Rect2D Rect => new Rect2D(new Point2D(), this.Size);
         [NotMapped] [JsonIgnore] public Rect2D RightEdge => new Rect2D(this.Rect.B, this.Rect.D);
@@ -216,34 +259,28 @@ namespace BugScapeCommon {
         protected override DatabaseObject CopyFromDatabase(DatabaseObject o) {
             this.Size = ((Map)o).Size.CloneFromDatabase();
             this.IsNewCharacterMap = ((Map)o).IsNewCharacterMap;
-            this.MapObjects = new List<MapObject>(((Map)o).MapObjects.Select(x => (MapObject)x.CloneFromDatabase()));
-            foreach (var x in this.MapObjects) x.Map = this;
+            this.Portals = new List<Portal>(((Map)o).Portals.Select(x => (Portal)x.CloneFromDatabase()));
+            this.MapObstacles = new List<MapObstacle>(((Map)o).MapObstacles.Select(x => (MapObstacle)x.CloneFromDatabase()));
+            foreach (var x in this.MapObstacles) x.Map = this;
+            foreach (var x in this.Portals) x.Map = this;
             return base.CopyFromDatabase(o);
         }
 
         public override DatabaseObject CloneFromDatabase() { return new Map().CopyFromDatabase(this); }
     }
 
-    public class Character : DatabaseObject {
+    public class Character : MapObject {
         [Index(IsUnique = true), MinLength(6), MaxLength(32), RegularExpression(@"[0-9a-zA-Z_\!\@\#\$\%\^\&\*\-\=\+]*")]
         public string DisplayName { get; set; }
         
         public RgbColor Color { get; set; }
-
-        public Point2D Size { get; set; }
-        public Point2D Location { get; set; }
-
         public double Speed { get; set; }
-
-        [JsonIgnore]
-        public virtual Map Map { get; set; }
-
+        
         [JsonIgnore]
         public virtual User User { get; set; }
 
-        [NotMapped]
-        [JsonIgnore]
-        public Rect2D Rect => new Rect2D(this.Location, this.Location + this.Size);
+        [NotMapped] [JsonIgnore] public Portal CurrentPortal
+            => this.Map.Portals.SingleOrDefault(x => this.Rect.CoveragePercentage(x.Rect) > 0.25);
 
         [NotMapped]
         public DateTime LastMoveTime { get; set; }
@@ -320,7 +357,7 @@ namespace BugScapeCommon {
 
             // Get all rects that might collide with us
             var collidableRects = this.Map.AllEdges;
-            collidableRects.AddRange(this.Map.MapObjects.Where(x => x.IsBlocking).Select(x => x.Rect));
+            collidableRects.AddRange(this.Map.MapObstacles.Where(x => x.IsBlocking).Select(x => x.Rect));
 
             // Check for collisions and update moveRect
             var moveRect = new Rect2D(this.Location, this.Location + moveRectSize);

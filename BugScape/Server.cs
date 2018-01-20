@@ -76,6 +76,7 @@ namespace BugScape {
     }
 
     public class BugScapeServer {
+        private readonly Random _rnd = new Random();
         private readonly ClientStates _clients = new ClientStates();
 
         private readonly SemaphoreSlim _loginLock = new SemaphoreSlim(1);
@@ -95,7 +96,8 @@ namespace BugScape {
                 {typeof (BugScapeRequestCharacterCreate), this.HandleRequestCharacterCreateAsync},
                 {typeof (BugScapeRequestCharacterRemove), this.HandleRequestCharacterRemoveAsync},
                 {typeof (BugScapeRequestCharacterEnter), this.HandleRequestCharacterEnterAsync},
-                {typeof (BugScapeRequestMove), this.HandleRequestMoveAsync}
+                {typeof (BugScapeRequestMove), this.HandleRequestMoveAsync},
+                {typeof (BugscapeRequestUsePortal), this.HandleRequestUsePortalAsync}
             };
         }
 
@@ -111,6 +113,12 @@ namespace BugScape {
                 foreach (var map in await dbContext.Maps.ToListAsync()) {
                     this._onlineMaps[map.ID] = (Map)map.CloneFromDatabase();
                     this._onlineMaps[map.ID].Characters = new List<Character>();
+                }
+
+                /* Set all portal dest connections */
+                foreach (var portal in this._onlineMaps.Values.SelectMany(map => map.Portals)) {
+                    var destPortal = (await dbContext.Portals.SingleAsync(x => x.ID == portal.ID)).DestPortal;
+                    portal.DestPortal = this._onlineMaps[destPortal.Map.ID].Portals.Single(x => x.ID == destPortal.ID);
                 }
             }
 
@@ -306,28 +314,43 @@ namespace BugScape {
             await this.MapUpdated(this._clients[client]?.Character?.Map);
             return null;
         }
+        private async Task<BugScapeMessage> HandleRequestUsePortalAsync(BugScapeMessage data, JsonClient client) {
+            var character = this._clients[client]?.Character;
+            var destPortal = character?.CurrentPortal?.DestPortal;
+            if (destPortal == null) return null;
+
+            /* Remove the character from the old map */
+            await this.RemoveCharacterFromMap(character);
+
+            /* Spawn the character in the new map */
+            await this.SpawnCharacterInPortal(character, destPortal);
+
+            /* inform the client about the change */
+            return new BugScapeResponseCharacterChanged {Map = character.Map, Character = character};
+        }
 
         private async Task MapUpdated(Map map) {
             if (map == null) return;
             var update = new BugScapeResponseMapChanged {Map = map};
-            await
-            Task.WhenAll(
-                         map.Characters.Select(
-                                               character =>
-                                               this._reactor.SendDataAsync(this._clients[character].Client, update)));
+            await Task.WhenAll(map.Characters.Select(x => this._reactor.SendDataAsync(this._clients[x].Client, update)));
         }
-        
-        private async Task SpawnCharacterInMap(Character character, Map map) {
+
+        private async Task SpawnCharacterInPortal(Character character, Portal portal) {
             /* Set map to character */
-            character.Map = map;
+            character.Map = portal.Map;
+
+            /* Set location to character */
+            character.Location = new Point2D(portal.Location);
 
             /* Add character to map */
-            map.Characters.Add(character);
+            portal.Map.Characters.Add(character);
 
             /* Send update */
-            await this.MapUpdated(map);
-
-            await Task.Delay(0); /* To avoid warning */
+            await this.MapUpdated(portal.Map);
+        }
+        private async Task SpawnCharacterInMap(Character character, Map map) {
+            var portals = map.DefaultSpawnablePortals;
+            await this.SpawnCharacterInPortal(character, portals.ElementAt(this._rnd.Next(portals.Count)));
         }
         private async Task RemoveCharacterFromMap(Character character) {
             if (character?.Map == null) return;
@@ -340,8 +363,6 @@ namespace BugScape {
 
             /* Remove map from character */
             character.Map = null;
-
-            await Task.Delay(0); /* To avoid warning */
         }
 
         private delegate Task<BugScapeMessage> UserMessageHandler(BugScapeMessage data, JsonClient client);
