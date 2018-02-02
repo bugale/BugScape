@@ -17,10 +17,8 @@ namespace BugScape {
                         MapObstacles =
                             new List<MapObstacle> {
                                 new MapWall {
-                                    Color = new RgbColor(0, 0, 0),
                                     Location = new Point2D(100, 100),
-                                    Size = new Point2D(50, 50),
-                                    IsBlocking = true
+                                    Size = new Point2D(50, 50)
                                 }
                             }
                     };
@@ -29,16 +27,12 @@ namespace BugScape {
                         MapObstacles =
                             new List<MapObstacle> {
                                 new MapWall {
-                                    Color = new RgbColor(0, 0, 0),
                                     Location = new Point2D(200, 200),
-                                    Size = new Point2D(50, 50),
-                                    IsBlocking = true
+                                    Size = new Point2D(50, 50)
                                 },
                                 new MapWall {
-                                    Color = new RgbColor(255, 0, 0),
                                     Location = new Point2D(300, 300),
-                                    Size = new Point2D(50, 80),
-                                    IsBlocking = true
+                                    Size = new Point2D(100, 180)
                                 }
                             }
                     };
@@ -47,41 +41,45 @@ namespace BugScape {
                         MapObstacles =
                             new List<MapObstacle> {
                                 new MapWall {
-                                    Color = new RgbColor(0, 255, 0),
                                     Location = new Point2D(0, 0),
-                                    Size = new Point2D(50, 50),
-                                    IsBlocking = true
+                                    Size = new Point2D(250, 50)
                                 },
                                 new MapWall {
-                                    Color = new RgbColor(0, 255, 0),
-                                    Location = new Point2D(200, 200),
-                                    Size = new Point2D(50, 50),
-                                    IsBlocking = true
+                                    Location = new Point2D(0, 0),
+                                    Size = new Point2D(50, 250)
+                                },
+                                new MapWall {
+                                    Location = new Point2D(200, 0),
+                                    Size = new Point2D(50, 250)
+                                },
+                                new MapWall {
+                                    Location = new Point2D(0, 200),
+                                    Size = new Point2D(250, 50)
                                 }
                             }
                     };
                     var p1 = new Portal {
                         IsDefaultSpawnable = true,
                         Location = new Point2D(10, 10),
-                        Size = new Point2D(50, 50),
+                        Size = new Point2D(75, 75),
                         Map = m1
                     };
                     var p2 = new Portal {
                         IsDefaultSpawnable = true,
                         Location = new Point2D(10, 10),
-                        Size = new Point2D(50, 50),
+                        Size = new Point2D(75, 75),
                         Map = m2
                     };
                     var p3 = new Portal {
                         IsDefaultSpawnable = true,
                         Location = new Point2D(400, 10),
-                        Size = new Point2D(50, 50),
+                        Size = new Point2D(75, 75),
                         Map = m2
                     };
                     var p4 = new Portal {
                         IsDefaultSpawnable = true,
                         Location = new Point2D(100, 100),
-                        Size = new Point2D(50, 50),
+                        Size = new Point2D(75, 75),
                         Map = m3
                     };
                     dbContext.Maps.Add(m1);

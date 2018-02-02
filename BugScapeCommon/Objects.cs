@@ -28,6 +28,12 @@ namespace BugScapeCommon {
         public static Point2D operator -(Point2D a, Point2D b) {
             return new Point2D(a.X - b.X, a.Y - b.Y);
         }
+        public static Point2D operator /(Point2D a, double b) {
+            return new Point2D(a.X / b, a.Y / b);
+        }
+        public static Point2D operator *(Point2D a, double b) {
+            return new Point2D(a.X * b, a.Y * b);
+        }
 
         public Point2D CloneFromDatabase() { return new Point2D(this); }
     }
@@ -68,6 +74,7 @@ namespace BugScapeCommon {
         public Point2D B => new Point2D(this.XMax, this.YMin);
         public Point2D C => new Point2D(this.XMin, this.YMax);
         public Point2D D => new Point2D(this.XMax, this.YMax);
+        public Point2D Center => (this.A + this.D)/2;
 
         public double Area => (this.XMax - this.XMin)*(this.YMax - this.YMin);
 
@@ -224,12 +231,7 @@ namespace BugScapeCommon {
     }
 
     public class MapWall : MapObstacle {
-        public RgbColor Color { get; set; }
-
-        protected override DatabaseObject CopyFromDatabase(DatabaseObject o) {
-            this.Color = ((MapWall)o).Color.CloneFromDatabase();
-            return base.CopyFromDatabase(o);
-        }
+        public override bool IsBlocking => true;
 
         public override DatabaseObject CloneFromDatabase() { return new MapWall().CopyFromDatabase(this); }
     }

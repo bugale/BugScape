@@ -1,16 +1,26 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using BugScapeCommon;
 
 namespace BugScapeClient.Pages {
     public partial class GamePage : ISwitchable {
+        private static readonly ImageSource PortalImageSource =
+        Imaging.CreateBitmapSourceFromHBitmap(BugScapeCommon.Properties.Resources.Portal.GetHbitmap(), IntPtr.Zero,
+                                              Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+        private static readonly ImageSource WallImageSource =
+        Imaging.CreateBitmapSourceFromHBitmap(BugScapeCommon.Properties.Resources.Wall.GetHbitmap(), IntPtr.Zero,
+                                              Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+
         private Map Map { get; set; }
         private Character Character { get; set; }
         private bool _shouldRedraw;
@@ -104,6 +114,66 @@ namespace BugScapeClient.Pages {
                 MoveMax = true
             });
         }
+
+        private void AddToCanvas(FrameworkElement element, Point2D location, Point2D size) {
+            if (element == null) return;
+            if (size != null) {
+                element.Width = size.X;
+                element.Height = size.Y;
+            }
+            if (location != null) {
+                Canvas.SetLeft(element, location.X);
+                Canvas.SetTop(element, location.Y);
+            }
+            this.MapCanvas.Children.Add(element);
+        }
+        private void DrawMapWall(MapWall wall) {
+            var brush = new ImageBrush {
+                ImageSource = WallImageSource,
+                TileMode = TileMode.Tile,
+                ViewportUnits = BrushMappingMode.Absolute,
+                Viewport = new Rect(new Point(0, 0), new Point(WallImageSource.Width, WallImageSource.Height))
+            };
+            var element = new Rectangle {Fill = brush};
+            this.AddToCanvas(element, wall.Location, wall.Size);
+        }
+        private void DrawPortal(Portal portal) {
+            var element = new Image {
+                Source = PortalImageSource,
+                Stretch = Stretch.Fill
+            };
+            this.AddToCanvas(element, portal.Location, portal.Size);
+        }
+        private void DrawCharacter(Character character) {
+            /* Draw figure */
+            var characterFigure = new Ellipse {
+                Fill =
+                        new SolidColorBrush(Color.FromRgb(character.Color.R, character.Color.G, character.Color.B)),
+                Stroke = new SolidColorBrush(Color.FromRgb(0, 0, 0))
+            };
+            this.AddToCanvas(characterFigure, character.Location, character.Size);
+
+            /* Draw display name */
+            var displayNameLabel = new Label {Content = character.DisplayName, FontSize = 20};
+            displayNameLabel.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+
+            /* Set it centered horizontally, below the figure */
+            var location = character.Location +
+                           new Point2D(0.5*(characterFigure.Width - displayNameLabel.DesiredSize.Width),
+                                       characterFigure.Height);
+
+            /* Create backshadow */
+            var backShadow = new Rectangle {
+                Fill = new SolidColorBrush(Color.FromRgb(255, 255, 255)),
+                Stroke = new SolidColorBrush(Color.FromRgb(0, 0, 0)),
+                Opacity = 0.5,
+                RadiusX = 10,
+                RadiusY = 10
+            };
+
+            this.AddToCanvas(backShadow, location, new Point2D(displayNameLabel.DesiredSize.Width, displayNameLabel.DesiredSize.Height));
+            this.AddToCanvas(displayNameLabel, location, null);
+        }
         private void RedrawMap(object sender, EventArgs args) {
             if (!this._shouldRedraw) return;
 
@@ -118,67 +188,19 @@ namespace BugScapeClient.Pages {
             this.MapCanvas.Width = map.Size.X;
             this.MapCanvas.Height = map.Size.Y;
 
-            /* Draw map obstacles */
-            foreach (var mapObstacle in map.MapObstacles) {
-                UIElement objectVisual = null;
-
-                if (mapObstacle is MapWall) {
-                    /* Draw wall */
-                    objectVisual = new Rectangle {
-                        Fill =
-                            new SolidColorBrush(Color.FromRgb(((MapWall)mapObstacle).Color.R, ((MapWall)mapObstacle).Color.G,
-                                                              ((MapWall)mapObstacle).Color.B)),
-                        Stroke = new SolidColorBrush(Color.FromRgb(0, 0, 0)),
-                        Width = mapObstacle.Size.X,
-                        Height = mapObstacle.Size.Y
-                    };
-                }
-
-                if (objectVisual == null) continue;
-                Canvas.SetLeft(objectVisual, mapObstacle.Location.X);
-                Canvas.SetTop(objectVisual, mapObstacle.Location.Y);
-                this.MapCanvas.Children.Add(objectVisual);
+            /* Draw walls */
+            foreach (var wall in map.MapObstacles.OfType<MapWall>()) {
+                this.DrawMapWall(wall);
             }
 
             /* Draw portals */
             foreach (var portal in map.Portals) {
-                var objectVisual = new Rectangle {
-                    Fill =
-                        new SolidColorBrush(Color.FromRgb(0, 128, 255)),
-                    Stroke = new SolidColorBrush(Color.FromRgb(0, 0, 0)),
-                    Width = portal.Size.X,
-                    Height = portal.Size.Y
-                };
-                
-                Canvas.SetLeft(objectVisual, portal.Location.X);
-                Canvas.SetTop(objectVisual, portal.Location.Y);
-                this.MapCanvas.Children.Add(objectVisual);
+                this.DrawPortal(portal);
             }
 
             /* Draw characters */
             foreach (var character in map.Characters) {
-                /* Draw figure */
-                var characterFigure = new Ellipse {
-                    Fill =
-                        new SolidColorBrush(Color.FromRgb(character.Color.R, character.Color.G, character.Color.B)),
-                    Stroke = new SolidColorBrush(Color.FromRgb(0, 0, 0)),
-                    Width = character.Size.X,
-                    Height = character.Size.Y
-                };
-                Canvas.SetLeft(characterFigure, character.Location.X);
-                Canvas.SetTop(characterFigure, character.Location.Y);
-                this.MapCanvas.Children.Add(characterFigure);
-
-                /* Draw display name */
-                var displayNameLabel = new Label {Content = character.DisplayName, FontSize = 20};
-                displayNameLabel.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-
-                Canvas.SetLeft(displayNameLabel,
-                               character.Location.X - 0.5*displayNameLabel.DesiredSize.Width +
-                               0.5*characterFigure.Width); /* Set it centered horizontally */
-                Canvas.SetTop(displayNameLabel, character.Location.Y + characterFigure.Height);
-                /* Set it below the figure */
-                this.MapCanvas.Children.Add(displayNameLabel);
+                this.DrawCharacter(character);
             }
         }
     }

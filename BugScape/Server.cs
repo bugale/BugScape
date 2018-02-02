@@ -231,7 +231,7 @@ namespace BugScape {
                         Map = spawnMap,
                         Location = new Point2D(1, 1),
                         Size = new Point2D(50, 50),
-                        Speed = 50
+                        Speed = 100
                     });
                     await dbContext.SaveChangesAsync();
                 } finally {
@@ -340,7 +340,7 @@ namespace BugScape {
             character.Map = portal.Map;
 
             /* Set location to character */
-            character.Location = new Point2D(portal.Location);
+            character.Location = portal.Rect.Center - character.Size/2;
 
             /* Add character to map */
             portal.Map.Characters.Add(character);
