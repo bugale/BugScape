@@ -73,7 +73,8 @@ namespace BugScapeCommon {
         }
 
         public async Task WriteObjectAsync(object obj) {
-            var dataStr = await JsonConvert.SerializeObjectAsync(obj, Formatting.None, this._settings);
+            // The sync SerializeObject is used, because obj might change if context is lost
+            var dataStr = JsonConvert.SerializeObject(obj, Formatting.None, this._settings);
             var dataLength = (short)Encoding.UTF8.GetByteCount(dataStr);
             var lengthBuffer = BitConverter.GetBytes(dataLength);
             
@@ -192,9 +193,9 @@ namespace BugScapeCommon {
                     await this.InvokeHandler(client, ReactorAction.ReceivedData, data);
                 }
             } catch (IOException) {
-                Console.WriteLine("Client disconnected");
+                Console.WriteLine(@"Client disconnected");
             } catch (Exception e) {
-                Console.WriteLine("Exception while handling tcp client read: {0}", e);
+                Console.WriteLine(@"Exception while handling tcp client read: {0}", e);
             } finally {
                 await this.ClientDisconnectAsync(client);
             }
@@ -210,9 +211,9 @@ namespace BugScapeCommon {
                     await client.SendObjectAsync(data);
                 }
             } catch (IOException) {
-                Console.WriteLine("Client disconnected");
+                Console.WriteLine(@"Client disconnected");
             } catch (Exception e) {
-                Console.WriteLine("Exception while handling tcp client read: {0}", e);
+                Console.WriteLine(@"Exception while handling tcp client write: {0}", e);
             } finally {
                 await this.ClientDisconnectAsync(client);
             }
