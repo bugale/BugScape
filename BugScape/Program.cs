@@ -6,7 +6,7 @@ using BugScapeCommon;
 namespace BugScape {
     internal class Program {
         private static void Main() {
-            Console.WriteLine("Hello BugScape!");
+            Console.WriteLine(@"Hello BugScape!");
 
             /* Add basic map for testing */
             using (var dbContext = new BugScapeDbContext()) {

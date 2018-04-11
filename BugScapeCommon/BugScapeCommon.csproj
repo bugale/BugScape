@@ -52,6 +52,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BugscapeServerConnStrBuilder.cs" />
+    <Compile Include="EntityFramework.cs" />
     <Compile Include="JsonTcp.cs" />
     <Compile Include="Objects.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

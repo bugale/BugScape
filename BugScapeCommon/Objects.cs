@@ -179,7 +179,7 @@ namespace BugScapeCommon {
 
     public abstract class DatabaseObject {
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-        public int ID { get; set; }
+        public virtual int ID { get; set; }
         
         protected virtual DatabaseObject CopyFromDatabase(DatabaseObject o) {
             this.ID = o.ID;
@@ -190,8 +190,8 @@ namespace BugScapeCommon {
     }
 
     public abstract class MapObject : DatabaseObject {
-        public Point2D Size { get; set; }
-        public Point2D Location { get; set; }
+        public virtual Point2D Size { get; set; }
+        public virtual Point2D Location { get; set; }
 
         [JsonIgnore]
         public virtual Map Map { get; set; }
@@ -220,7 +220,7 @@ namespace BugScapeCommon {
         [JsonIgnore]
         public virtual Portal DestPortal { get; set; }
 
-        public bool IsDefaultSpawnable { get; set; }
+        public virtual bool IsDefaultSpawnable { get; set; }
 
         protected override DatabaseObject CopyFromDatabase(DatabaseObject o) {
             this.IsDefaultSpawnable = ((Portal)o).IsDefaultSpawnable;
@@ -237,9 +237,11 @@ namespace BugScapeCommon {
     }
 
     public class Map : DatabaseObject {
-        public Point2D Size { get; set; }
+        public virtual string Name { get; set; }
 
-        public bool IsNewCharacterMap { get; set; }
+        public virtual Point2D Size { get; set; }
+
+        public virtual bool IsNewCharacterMap { get; set; }
 
         public virtual ICollection<Character> Characters { get; set; }
 
@@ -259,6 +261,7 @@ namespace BugScapeCommon {
             => new List<Rect2D> {this.UpEdge, this.DownEdge, this.RightEdge, this.LeftEdge};
 
         protected override DatabaseObject CopyFromDatabase(DatabaseObject o) {
+            this.Name = ((Map)o).Name;
             this.Size = ((Map)o).Size.CloneFromDatabase();
             this.IsNewCharacterMap = ((Map)o).IsNewCharacterMap;
             this.Portals = new List<Portal>(((Map)o).Portals.Select(x => (Portal)x.CloneFromDatabase()));
@@ -273,10 +276,10 @@ namespace BugScapeCommon {
 
     public class Character : MapObject {
         [Index(IsUnique = true), MinLength(6), MaxLength(32), RegularExpression(@"[0-9a-zA-Z_\!\@\#\$\%\^\&\*\-\=\+]*")]
-        public string DisplayName { get; set; }
+        public virtual string DisplayName { get; set; }
         
         public RgbColor Color { get; set; }
-        public double Speed { get; set; }
+        public virtual double Speed { get; set; }
         
         [JsonIgnore]
         public virtual User User { get; set; }
@@ -374,9 +377,9 @@ namespace BugScapeCommon {
 
     public class User : DatabaseObject {
         [Index(IsUnique = true), MinLength(6), MaxLength(32), RegularExpression(@"[0-9a-zA-Z_\!\@\#\$\%\^\&\*\-\=\+]*")]
-        public string Username { get; set; }
+        public virtual string Username { get; set; }
 
-        public HashedPassword Password { get; set; }
+        public virtual HashedPassword Password { get; set; }
 
         public virtual ICollection<Character> Characters { get; set; }
         

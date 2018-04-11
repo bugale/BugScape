@@ -83,7 +83,7 @@ namespace BugScape {
         private readonly SemaphoreSlim _registrationLock = new SemaphoreSlim(1);
         private readonly SemaphoreSlim _characterCreateLock = new SemaphoreSlim(1);
 
-        private readonly Dictionary<int, Map> _onlineMaps = new Dictionary<int, Map>();
+        private Dictionary<int, Map> _onlineMaps;
 
         private readonly AsyncJsonTcpReactor<BugScapeMessage> _reactor = new AsyncJsonTcpReactor<BugScapeMessage>();
 
@@ -106,20 +106,10 @@ namespace BugScape {
                                      this.HandleUserDisconnectionAsync);
             this._reactor.SetHandler(AsyncJsonTcpReactor<BugScapeMessage>.ReactorAction.ReceivedData,
                                      this.HandleUserMessageAsync);
-
+            
             /* Load all maps */
             using (var dbContext = new BugScapeDbContext()) {
-                /* Convert to list here to prevent database access inside loop from interfering with the maps request */
-                foreach (var map in await dbContext.Maps.ToListAsync()) {
-                    this._onlineMaps[map.ID] = (Map)map.CloneFromDatabase();
-                    this._onlineMaps[map.ID].Characters = new List<Character>();
-                }
-
-                /* Set all portal dest connections */
-                foreach (var portal in this._onlineMaps.Values.SelectMany(map => map.Portals)) {
-                    var destPortal = (await dbContext.Portals.SingleAsync(x => x.ID == portal.ID)).DestPortal;
-                    portal.DestPortal = this._onlineMaps[destPortal.Map.ID].Portals.Single(x => x.ID == destPortal.ID);
-                }
+                this._onlineMaps = await dbContext.GetMapStructureDictAsync();
             }
 
             /* Run reactor */

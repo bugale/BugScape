@@ -1,0 +1,77 @@
+﻿<Window x:Class="BugScapeMapEditor.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:bugScapeMapEditor="clr-namespace:BugScapeMapEditor"
+        mc:Ignorable="d"
+        Title="MapEditor" MinHeight="450" MinWidth="525" Height="450" Width="525" Loaded="MainWindow_OnLoaded">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition MinWidth="150" Width="150"/>
+            <ColumnDefinition Width="5"/>
+            <ColumnDefinition MinWidth="150" Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="30" />
+                <RowDefinition Height="30" />
+                <RowDefinition Height="30" />
+                <RowDefinition Height="30" />
+            </Grid.RowDefinitions>
+            <DataGrid Grid.Row="0" x:Name="MapList" IsReadOnly="True" AutoGenerateColumns="False"
+                      d:DataContext="{d:DesignInstance bugScapeMapEditor:EditingMap}" ItemsSource="{Binding NotifyOnSourceUpdated=True, UpdateSourceTrigger=PropertyChanged}">
+                <DataGrid.Resources>
+                    <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#FF0078D7"/>
+                </DataGrid.Resources>
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow">
+                        <Setter Property="Background" Value="{Binding StateColor}"/>
+                        <EventSetter Event="MouseDoubleClick" Handler="MapList_MapDoubleClick"/>
+                    </Style>
+                </DataGrid.RowStyle>
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="ID" Binding="{Binding Map.ID}" CanUserResize="False"/>
+                    <DataGridTextColumn Header="Name" Binding="{Binding Map.Name}" CanUserResize="False" Width="*"/>
+                </DataGrid.Columns>
+            </DataGrid>
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Label Grid.Column="0" Content="Search:" HorizontalAlignment="Center"/>
+                <TextBox Grid.Column="1" VerticalContentAlignment="Center" TextChanged="SearchTextChanged"/>
+            </Grid>
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Content="+ New" Foreground="#FF009900" FontWeight="Bold" Click="AddNewMap"/>
+                <Button Grid.Column="1" Content="X Delete" Foreground="#FFFF6600" FontWeight="Bold" Click="DeleteMaps"/>
+            </Grid>
+            <Grid Grid.Row="3">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Content="Save All" Foreground="Blue" FontWeight="Bold" Click="SaveAllChanges"/>
+                <Button Grid.Column="1" Content="Discard All" Foreground="Red" FontWeight="Bold" Click="DiscardAllChanges"/>
+            </Grid>
+            <Label Grid.Row="4" x:Name="LoadingLabel" Content="Loading... Please wait" HorizontalAlignment="Center"/>
+        </Grid>
+        <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch"/>
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition MinHeight="300" Height="*" />
+                <RowDefinition Height="5" />
+                <RowDefinition MinHeight="120" Height="120" />
+            </Grid.RowDefinitions>
+            <Canvas Grid.Row="0"/>
+            <GridSplitter Grid.Row="1" HorizontalAlignment="Stretch"/>
+            <Frame x:Name="PropertiesFrame" Grid.Row="2" NavigationUIVisibility="Hidden"/>
+        </Grid>
+    </Grid>
+</Window>
